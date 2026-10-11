@@ -10,10 +10,10 @@ try {
   console.error(error.message);
   process.exit(1);
 }
-const {production,accessCode,adminPin,port}=config;
+const {production,port}=config;
 const db=await openDatabase({url:config.databaseUrl,directory:config.dataDirectory});
 await initializeDatabase(db);
-const app=createApp(db,{production,accessCode,adminPin});
+const app=createApp(db,{production});
 const server=app.listen(port,'0.0.0.0',()=>console.log(`Gentlemans Bar läuft auf http://localhost:${port}`));
 let shuttingDown=false;
 async function shutdown() {

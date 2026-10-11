@@ -10,7 +10,7 @@ import { createApp } from '../lib/app.js';
 test('Kasse: Integration mit echter PostgreSQL-Engine', async t => {
   const db=await openDatabase({memory:true});
   await initializeDatabase(db);
-  const app=createApp(db,{accessCode:'test-zugang',adminPin:'1234',loginLimit:1000});
+  const app=createApp(db,{loginLimit:1000});
   const server=app.listen(0,'127.0.0.1');
   await new Promise(resolve=>server.once('listening',resolve));
   const base=`http://127.0.0.1:${server.address().port}/api`;
@@ -21,26 +21,34 @@ test('Kasse: Integration mit echter PostgreSQL-Engine', async t => {
     const data=type.includes('json')?await res.json():await res.text();
     return {status:res.status,data,cookie:res.headers.get('set-cookie')?.split(';')[0],headers:res.headers};
   }
-  const login=async name=>request('/login',{method:'POST',body:{name,accessCode:'test-zugang'}});
+  const login=async name=>request('/login',{method:'POST',body:{name}});
   let alice,bob,aliceId,firstOrder,secondOrder;
   const sale=(items,extra={})=>({id:randomUUID(),payment:'cash',currency:'EUR',items:items.map(([productId,quantity,unitPriceCents])=>({productId,quantity,unitPriceCents})),...extra});
 
-  await t.test('Zugangsschutz, CSRF und PIN',async()=>{
+  await t.test('Anmeldung nur mit Name, gültige Sitzung und CSRF-Prüfung',async()=>{
     assert.equal((await request('/health')).status,200);
     assert.equal((await request('/products')).status,401);
-    assert.equal((await request('/login',{method:'POST',body:{name:'Alice',accessCode:'falsch'}})).status,401);
-    assert.equal((await request('/login',{method:'POST',body:{name:'Alice',accessCode:'test-zugang'},origin:'https://fremde-seite.example'})).status,403);
+    assert.equal((await request('/login',{method:'POST',body:{name:''}})).status,400);
+    assert.equal((await request('/login',{method:'POST',body:{name:'Alice'},origin:'https://fremde-seite.example'})).status,403);
     const a=await login('Alice');alice=a.cookie;aliceId=a.data.employee.id;
     const b=await login('Bob');bob=b.cookie;
-    assert.equal((await request('/products',{method:'POST',cookie:alice,body:{name:'Test',category:'Snacks',price_cents:100}})).status,403);
-    assert.equal((await request('/admin/unlock',{method:'POST',cookie:alice,body:{pin:'0000'}})).status,401);
-    assert.equal((await request('/admin/unlock',{method:'POST',cookie:alice,body:{pin:'1234'}})).status,200);
+    assert.equal((await request('/products',{method:'POST',body:{name:'Test',category:'Snacks',price_cents:100}})).status,401);
+    assert.equal((await request('/products?all=true',{cookie:bob})).status,200);
   });
   await t.test('Gleiche Namen werden unabhängig von Großschreibung zusammengeführt',async()=>{
     const same=await login('  ALICE  ');
     assert.equal(same.data.employee.id,aliceId);
     assert.equal(same.data.employee.name,'Alice');
     assert.equal((await db.query('SELECT COUNT(*)::int AS count FROM employees')).rows[0].count,2);
+  });
+  await t.test('Jeder angemeldete Mitarbeiter kann Artikel und Preise ohne PIN ändern',async()=>{
+    const added=await request('/products',{method:'POST',cookie:bob,body:{name:'Testartikel',category:'Snacks',description:'Test',price_cents:111}});
+    assert.equal(added.status,201);
+    const changed=await request(`/products/${added.data.product.id}`,{method:'PUT',cookie:alice,body:{name:'Testartikel',category:'Snacks',description:'Test',price_cents:125,active:false}});
+    assert.equal(changed.status,200);assert.equal(changed.data.product.price_cents,125);
+    assert.equal((await request('/products?all=true',{cookie:bob})).data.products.find(p=>p.id===added.data.product.id).price_cents,125);
+    assert.equal((await request('/settings',{method:'PUT',cookie:bob,body:{currency:'USD'}})).status,200);
+    assert.equal((await request('/settings',{method:'PUT',cookie:alice,body:{currency:'EUR'}})).status,200);
   });
   await t.test('Menge und Preis: 3 × 9,50 + 2 × 3,50 = 35,50, Zuordnung aus der Sitzung',async()=>{
     const payload=sale([['cuba-libre',3,950],['cola',2,350]],{employee_id:'gefälscht',total_cents:1});
@@ -72,7 +80,7 @@ test('Kasse: Integration mit echter PostgreSQL-Engine', async t => {
   });
   await t.test('Geänderte Preise und deaktivierte Artikel, historische Preise bleiben erhalten',async()=>{
     const body={name:'Cola neu',category:'Alkoholfrei',description:'Test',price_cents:500,active:true};
-    assert.equal((await request('/products/cola',{method:'PUT',cookie:alice,body})).status,200);
+    assert.equal((await request('/products/cola',{method:'PUT',cookie:bob,body})).status,200);
     assert.equal((await request('/orders',{method:'POST',cookie:alice,body:sale([['cola',1,350]])})).status,409);
     const order=(await request(`/orders/${firstOrder}`,{cookie:alice})).data;
     assert.equal(order.items.find(p=>p.product_id==='cola').price_cents,350);assert.equal(order.items.find(p=>p.product_id==='cola').name,'Cola');
@@ -81,7 +89,7 @@ test('Kasse: Integration mit echter PostgreSQL-Engine', async t => {
     assert.equal((await request('/orders',{method:'POST',cookie:alice,body:sale([['cola',1,500]])})).status,409);
   });
   await t.test('Storno passt Umsatz und Mitarbeitersumme an und verhindert doppeltes Storno',async()=>{
-    assert.equal((await request(`/orders/${secondOrder}/void`,{method:'POST',cookie:bob,body:{reason:'Falsch gebucht'}})).status,403);
+    assert.equal((await request(`/orders/${secondOrder}/void`,{method:'POST',body:{reason:'Falsch gebucht'}})).status,401);
     const result=await request(`/orders/${secondOrder}/void`,{method:'POST',cookie:alice,body:{reason:'Falsch gebucht'}});
     assert.equal(result.status,200);assert.ok(result.data.order.voided_at);
     assert.equal((await request(`/orders/${secondOrder}/void`,{method:'POST',cookie:alice,body:{reason:'Nochmal'}})).status,409);

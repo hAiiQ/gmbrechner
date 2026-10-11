@@ -9,7 +9,7 @@ Eine responsive Kasse in Schwarz, Oliv und Gold, gestaltet mit eurem Emblem und 
 - Verkauf buchen mit Kennzeichnung „Bar“ oder „Karte“. Die Seite erfasst die Zahlung; sie belastet keine Karte und verbindet kein Kartenterminal.
 - Umsatz pro Mitarbeiter, Gesamtumsatz, Tages-/Wochen-/Monatsübersicht und eigene Datumsfilter.
 - Buchungsdetails, meistverkaufte Artikel und CSV-Export aller Positionen im gewählten Zeitraum.
-- PIN-geschützte Artikelverwaltung: Preise ändern, Artikel hinzufügen und pausieren.
+- Artikelverwaltung für alle angemeldeten Mitarbeiter: Preise ändern, Artikel hinzufügen und pausieren.
 - Storno mit Begründung. Die ursprüngliche Buchung bleibt sichtbar und zählt nicht mehr zum Umsatz.
 - Zentrale PostgreSQL-Datenbank auf Render für mehrere Geräte. Doppelte Buchungsanfragen werden abgefangen.
 - Ein lokal gespeicherter Warenkorb pro Mitarbeiter. Bei Verbindungsabbruch bleibt eine offene Buchung gesperrt, bis ihr ihren Status über „Buchung prüfen“ erneut prüft.
@@ -29,7 +29,7 @@ Dann [http://localhost:3000](http://localhost:3000) öffnen. Unter Windows könn
 
 Es ist keine separate Datenbankinstallation notwendig: Für die lokale Vorschau wird eine PostgreSQL-Engine in `data/` gespeichert. Dieser Ordner wird nicht nach Render hochgeladen. Ein Neustart bewahrt die lokalen Daten.
 
-Lokale Verwaltungs-PIN: **2007**. Zum Ändern `.env.example` nach `.env` kopieren und `ADMIN_PIN` setzen. Optional könnt ihr auch lokal einen `BAR_ACCESS_CODE` setzen. Die automatische Vorschau zeigt den PIN-Hinweis nur im lokalen Modus.
+Die Anmeldung erfolgt ausschließlich mit dem Namen. Jeder angemeldete Mitarbeiter kann Artikel und Preise bearbeiten, die Währung vor dem ersten Verkauf festlegen und Buchungen mit Begründung stornieren.
 
 ## Auf Render veröffentlichen
 
@@ -38,13 +38,10 @@ Das Projekt wird als **Web Service mit PostgreSQL** betrieben. Eine „Static Si
 1. Die Dateien aus diesem Ordner oder dem ZIP in ein neues GitHub-Repository hochladen. **`package.json`, `package-lock.json`, `render.yaml`, `server.js`, `lib/` und `public/` müssen direkt im Stamm des Repositorys liegen**, nicht in einem zusätzlichen Unterordner. `node_modules/`, `data/` und `.env` nicht hochladen.
 2. Bei [Render](https://dashboard.render.com) anmelden und **New → Blueprint** wählen.
 3. Das GitHub-Repository verbinden. Render liest die beiliegende `render.yaml` und erstellt den Web Service sowie die Datenbank in Frankfurt.
-4. Die beiden abgefragten Werte setzen:
-   - `BAR_ACCESS_CODE`: ein eigener Zugangscode für das gesamte Team, mindestens vier Zeichen. Mitarbeiter geben ihn zusätzlich zu ihrem Namen ein.
-   - `ADMIN_PIN`: eine eigene PIN mit 4–12 Ziffern für Artikelverwaltung und Stornos. Nur der Barleitung geben.
-5. Den Blueprint anlegen und warten, bis die Bereitstellung abgeschlossen ist. Render gibt euch eine `https://…onrender.com`-Adresse.
-6. Die Adresse öffnen, mit Namen und Zugangscode anmelden und unter **Sortiment** mit eurer PIN zuerst Währung, Artikel und Preise festlegen.
+4. Den Blueprint anlegen und warten, bis die Bereitstellung abgeschlossen ist. Render gibt euch eine `https://…onrender.com`-Adresse. Es werden keine PIN oder Zugangscodes abgefragt.
+5. Die Adresse öffnen, mit Namen anmelden und unter **Sortiment** zuerst Währung, Artikel und Preise festlegen.
 
-`DATABASE_URL` wird durch den Blueprint automatisch verbunden. Der Server legt Tabellen und Beispielartikel beim ersten Start an. Weitere Deployments überschreiben weder Umsätze noch eure geänderte Karte. Im Produktionsmodus startet die App nur mit der zentralen Datenbank und gültigen Zugangswerten.
+`DATABASE_URL` wird durch den Blueprint automatisch verbunden. Der Server legt Tabellen und Beispielartikel beim ersten Start an. Weitere Deployments überschreiben weder Umsätze noch eure geänderte Karte. Im Produktionsmodus startet die App mit der zentralen Datenbank; die Anmeldung benötigt nur einen Namen.
 
 Die Konfiguration verwendet zunächst kostenlose Render-Instanzen. **Die kostenlose Render-Postgres-Datenbank läuft nach 30 Tagen ab.** Für dauerhaften Betrieb die Datenbank rechtzeitig auf einen kostenpflichtigen Tarif umstellen oder eine dauerhafte PostgreSQL-Datenbank über `DATABASE_URL` anschließen. Der kostenlose Web Service schläft nach 15 Minuten ohne Aufrufe ein; der erste Aufruf danach kann ungefähr eine Minute dauern. Für eine Kasse ohne diese Startpause den Web-Service-Tarif ändern. Aktuelle Bedingungen: [Render Free](https://render.com/docs/free).
 
@@ -52,13 +49,11 @@ Die Bereitstellungsvorlage folgt der [Render-Blueprint-Referenz](https://render.
 
 ## Wenn Render beim Start fehlschlägt
 
-Ein erfolgreicher Build bestätigt die Installation. Fehlende Zugangswerte müssen zusätzlich im Web Service unter **Environment** gesetzt werden. Der Start-Log nennt jetzt jeden fehlenden oder ungültigen Wert einzeln:
+Für Render muss `DATABASE_URL` die vollständige PostgreSQL-Verbindungsadresse enthalten. Der Blueprint trägt sie automatisch ein; falls sie fehlt, die **Internal Database URL** der angelegten Datenbank verwenden. Fehler in der Datenbankadresse oder im Port werden im Start-Log erklärt.
 
-- `ADMIN_PIN`: 4–12 Ziffern. Umgebende Leerzeichen beim Kopieren werden ignoriert.
-- `BAR_ACCESS_CODE`: eigener Zugangscode mit mindestens vier Zeichen. Der eingegebene Code muss dem konfigurierten Wert entsprechen.
-- `DATABASE_URL`: die vollständige PostgreSQL-Verbindungsadresse. Der Blueprint trägt sie automatisch ein; falls sie fehlt, die **Internal Database URL** der angelegten Render-Datenbank verwenden.
+`ADMIN_PIN` und `BAR_ACCESS_CODE` werden nicht mehr verwendet. Bereits vorhandene Werte in Render oder einer lokalen `.env` werden ignoriert. Damit kann der bestehende Web Service ohne diese Einstellungen neu deployt werden.
 
-Nach dem Korrigieren die Einstellungen speichern und erneut deployen. Ein GitHub-Push ersetzt diese Render-Einstellungen nicht. Die Meldung `.env not found. Continuing without it.` ist auf Render normal: Dort kommen die Werte direkt aus den Environment-Einstellungen.
+Die Meldung `.env not found. Continuing without it.` ist auf Render normal: Die Datenbankverbindung kommt aus den Environment-Einstellungen.
 
 ## Bedienung
 
@@ -67,9 +62,9 @@ Nach dem Korrigieren die Einstellungen speichern und erneut deployen. Ein GitHub
 3. Rechts Mengen nach Bedarf ändern und Zahlungsart wählen.
 4. Nach Zahlungseingang **Verkauf buchen**. Erst die erfolgreiche Serverantwort zählt als gebuchter Umsatz.
 5. Unter **Umsätze** Mitarbeiterbeträge und Gesamtsumme für den gewünschten Zeitraum ansehen. **Gesamt** zeigt die gesamte Historie.
-6. Über **Details → Buchung stornieren** kann die Barleitung eine Buchung mit Grund stornieren.
+6. Über **Details → Buchung stornieren** kann jeder angemeldete Mitarbeiter eine Buchung mit Grund stornieren.
 
-Anmeldungen gelten zwölf Stunden. Die Verwaltung bleibt nach PIN-Eingabe 30 Minuten entsperrt. Tagesgrenzen und Zeitangaben richten sich nach `Europe/Berlin`. Die Kassenansicht aktualisiert Karte und Tageswerte alle 30 Sekunden; in der Umsatzübersicht könnt ihr **Aktualisieren** wählen.
+Anmeldungen gelten zwölf Stunden. Das Sortiment ist nach der Namensanmeldung sofort bearbeitbar. Tagesgrenzen und Zeitangaben richten sich nach `Europe/Berlin`. Die Kassenansicht aktualisiert Karte und Tageswerte alle 30 Sekunden; in der Umsatzübersicht könnt ihr **Aktualisieren** wählen.
 
 Preisänderungen betreffen neue Verkäufe. Enthält ein offener Warenkorb einen alten Preis, lehnt der Server die Buchung ab: den Artikel entfernen und mit dem aktuellen Preis erneut hinzufügen. Pausierte Artikel können nicht neu gebucht werden.
 
@@ -77,7 +72,7 @@ Die CSV-Datei lässt sich mit Excel öffnen und verwendet Semikolon als Trennzei
 
 ## Technik und Prüfung
 
-Node.js, Express, PostgreSQL (`pg`), lokale PostgreSQL-Engine (`PGlite`), HTML/CSS/JavaScript ohne Buildschritt. Bilder und Schriften laden ohne externe Dienste. Buchungsbeträge werden serverseitig aus aktuellen Preisen berechnet, Mitarbeitende werden aus der Sitzung zugeordnet. Sitzungen verwenden HttpOnly-Cookies, im Produktionsmodus HTTPS; Verwaltung benötigt eine PIN. Die Namensanmeldung identifiziert den Mitarbeiter anhand seiner Eingabe, nicht über ein persönliches Passwort.
+Node.js, Express, PostgreSQL (`pg`), lokale PostgreSQL-Engine (`PGlite`), HTML/CSS/JavaScript ohne Buildschritt. Bilder und Schriften laden ohne externe Dienste. Buchungsbeträge werden serverseitig aus aktuellen Preisen berechnet, Mitarbeitende werden aus der Sitzung zugeordnet. Sitzungen verwenden HttpOnly-Cookies, im Produktionsmodus HTTPS. Die Artikelverwaltung ist für alle angemeldeten Mitarbeiter offen. Die Namensanmeldung identifiziert den Mitarbeiter anhand seiner Eingabe, nicht über ein persönliches Passwort.
 
 ```powershell
 npm run check

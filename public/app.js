@@ -31,7 +31,7 @@ const drawings = {
 const icon = (name,cls='') => `<svg class="icon ${cls}" viewBox="0 0 24 24" aria-hidden="true">${drawings[name]||drawings.glass}</svg>`;
 const categoryIcon = category => ({Cocktails:'cocktail',Longdrinks:'glass',Spirituosen:'whiskey','Bier & Wein':'wine',Alkoholfrei:'water',Snacks:'snack'}[category] || 'glass');
 const initials = name => name.trim().split(/\s+/).slice(0,2).map(s=>s[0]).join('').toUpperCase();
-const state = { config:null,employee:null,admin:false,view:'kasse',products:[],cart:[],payment:'cash',requestId:null,pending:null,category:'Alle',search:'',period:'today',from:null,to:null,connected:true,busy:false,epoch:0,lastOrder:null };
+const state = { config:null,employee:null,view:'kasse',products:[],cart:[],payment:'cash',requestId:null,pending:null,category:'Alle',search:'',period:'today',from:null,to:null,connected:true,busy:false,epoch:0,lastOrder:null };
 const modal = $('#modal');
 let toastTimer;
 function toast(message,error=false) {
@@ -70,10 +70,9 @@ async function api(url,{method='GET',body}={}) {
   const data=await response.json().catch(()=>({error:'Der Server ist gerade nicht erreichbar.'}));
   if(!response.ok){
     const error=new Error(data.error||'Die Anfrage ist fehlgeschlagen.');error.status=response.status;
-    if(response.status===401 && !['/login','/admin/unlock'].includes(url) && state.employee){
-      saveDraft();state.employee=null;state.admin=false;if(modal.open)modal.close();renderLogin();
+    if(response.status===401 && url!=='/login' && state.employee){
+      saveDraft();state.employee=null;if(modal.open)modal.close();renderLogin();
     }
-    if(response.status===403){state.admin=false;}
     throw error;
   }
   connection(true);return data;
@@ -94,12 +93,12 @@ function restoreDraft() {
 }
 function brand(){return `<div class="brand"><img src="/assets/emblem.png" alt="Logo der Gentlemans Bar"><div><div class="brand-name">GENTLEMANS</div><div class="brand-subtitle">BAR · GRAPESEED</div></div></div>`;}
 function renderLogin() {
-  $('#app').innerHTML=`<main class="login-page"><section class="login-scene">${brand()}<div class="login-intro"><img class="login-emblem" src="/assets/emblem.png" alt=""><h1>Gute Drinks.<br><em>Klare Zahlen.</em></h1><p>Ein Ort für gute Gesellschaft.<br>Eine Kasse, die den Überblick behält.</p></div><div class="scene-footer"><span>GRAPESEED · PLZ 2007</span><span>GENTLEMANS BAR</span></div></section><section class="login-panel"><form class="login-form" id="login-form"><div class="eyebrow"><span class="status-dot"></span>Hinter der Bar</div><h2>Willkommen im Team.</h2><p>Melde dich mit deinem Namen an.<br>Deine Verkäufe werden dir zugeordnet.</p><div class="field"><label for="employee-name">Dein Name</label><input id="employee-name" name="name" placeholder="Vor- und Nachname" required minlength="2" maxlength="40" autocomplete="name" autofocus></div>${state.config.accessCodeRequired?'<div class="field"><label for="access-code">Bar-Zugangscode</label><input id="access-code" name="accessCode" type="password" placeholder="Euer gemeinsamer Zugangscode" autocomplete="current-password" required></div>':''}<button class="button gold full" type="submit"><span>Kasse öffnen</span>${icon('arrow')}</button><p id="login-error" class="error" role="alert"></p><div class="login-note">${icon('lock')}<span>Nur für das Bar-Team.<br>Nutze immer denselben Namen für deine Umsatzübersicht.</span></div></form></section></main>`;
+  $('#app').innerHTML=`<main class="login-page"><section class="login-scene">${brand()}<div class="login-intro"><img class="login-emblem" src="/assets/emblem.png" alt=""><h1>Gute Drinks.<br><em>Klare Zahlen.</em></h1><p>Ein Ort für gute Gesellschaft.<br>Eine Kasse, die den Überblick behält.</p></div><div class="scene-footer"><span>GRAPESEED · PLZ 2007</span><span>GENTLEMANS BAR</span></div></section><section class="login-panel"><form class="login-form" id="login-form"><div class="eyebrow"><span class="status-dot"></span>Hinter der Bar</div><h2>Willkommen im Team.</h2><p>Melde dich mit deinem Namen an.<br>Deine Verkäufe werden dir zugeordnet.</p><div class="field"><label for="employee-name">Dein Name</label><input id="employee-name" name="name" placeholder="Vor- und Nachname" required minlength="2" maxlength="40" autocomplete="name" autofocus></div><button class="button gold full" type="submit"><span>Kasse öffnen</span>${icon('arrow')}</button><p id="login-error" class="error" role="alert"></p><div class="login-note">${icon('user')}<span>Nutze immer denselben Namen.<br>So bleiben deine Verkäufe dir zugeordnet.</span></div></form></section></main>`;
   $('#login-form').addEventListener('submit',async event=>{
     event.preventDefault();const form=event.currentTarget,button=$('button',form);button.disabled=true;$('#login-error').textContent='';
     try{
-      const result=await api('/login',{method:'POST',body:{name:form.elements.name.value,accessCode:form.elements.accessCode?.value||''}});
-      state.employee=result.employee;state.admin=false;state.view='kasse';state.category='Alle';state.search='';restoreDraft();await startApp();
+      const result=await api('/login',{method:'POST',body:{name:form.elements.name.value}});
+      state.employee=result.employee;state.view='kasse';state.category='Alle';state.search='';restoreDraft();await startApp();
     }catch(error){if($('#login-error'))$('#login-error').textContent=error.message;button.disabled=false;}
   });
 }
@@ -210,17 +209,11 @@ function statsContent({totals,employees,orders,bestsellers}) {
 }
 async function renderAdmin(epoch) {
   $('#main').innerHTML=pageHeading('Die Karte.','Eure Artikel. Eure Preise. Euer Stil.','Sortiment & Verwaltung');
-  if(!state.admin){
-    $('#main').insertAdjacentHTML('beforeend',`<form class="admin-lock" id="admin-unlock">${icon('lock')}<h2>Für die Barleitung.</h2><p>Entsperre die Verwaltung, um Artikel und Preise zu ändern oder Buchungen zu stornieren.</p><div class="field"><label for="admin-pin">Verwaltungs-PIN</label><input id="admin-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4,12}" minlength="4" maxlength="12" placeholder="PIN eingeben" autocomplete="off" required></div><button class="button gold full" type="submit">Verwaltung entsperren ${icon('lock')}</button><p id="admin-error" class="error" role="alert"></p>${state.config.localPreview?'<p class="helper">Lokale Vorschau: PIN 2007, sofern nicht in .env geändert.</p>':''}</form>`);
-    $('#admin-unlock').addEventListener('submit',async event=>{event.preventDefault();const button=$('button',event.currentTarget);button.disabled=true;
-      try{await api('/admin/unlock',{method:'POST',body:{pin:$('#admin-pin').value}});state.admin=true;renderPage();}catch(error){$('#admin-error').textContent=error.message;button.disabled=false;}
-    });return;
-  }
   try {
     const [{products},config]=await Promise.all([api('/products?all=true'),api('/config')]);
     if(epoch!==state.epoch||state.view!=='admin')return;state.allProducts=products;state.config=config;
     $('#main').insertAdjacentHTML('beforeend',`<div class="admin-top"><div class="currency-settings"><label for="currency">Währung der Kasse</label><select id="currency"><option value="EUR" ${config.currency==='EUR'?'selected':''}>Euro (€)</option><option value="USD" ${config.currency==='USD'?'selected':''}>Dollar ($)</option></select><button class="button" data-action="save-currency">Speichern</button></div><button class="button gold" data-action="add-product">${icon('plus')}Neuer Artikel</button></div><section class="panel"><div class="panel-heading"><h2>Das Sortiment</h2><span class="eyebrow">${products.length} Artikel</span></div><div class="table-scroll"><table class="admin-table"><thead><tr><th>Artikel</th><th>Kategorie</th><th class="right">Preis</th><th>Status</th><th></th></tr></thead><tbody>${products.map(p=>`<tr><td>${esc(p.name)}<div class="description-cell">${esc(p.description)}</div></td><td>${esc(p.category)}</td><td class="right">${money(p.price_cents)}</td><td><span class="badge ${p.active?'':'inactive'}">${p.active?'Aktiv':'Pausiert'}</span></td><td><div class="admin-actions"><button class="button" data-action="edit-product" data-id="${esc(p.id)}">${icon('edit')}Bearbeiten</button></div></td></tr>`).join('')}</tbody></table></div></section><p class="admin-note">Die Währung kann vor dem ersten Verkauf geändert werden. Pausierte Artikel verschwinden aus der Kasse. Bereits gebuchte Verkäufe behalten ihren ursprünglichen Preis.</p>`);
-  }catch(error){if(error.status===403&&epoch===state.epoch)return renderPage();if(epoch===state.epoch&&$('#main'))$('#main').insertAdjacentHTML('beforeend',`<div class="empty-state"><p>${esc(error.message)}</p><br><button class="button" data-action="refresh">Erneut laden</button></div>`);}
+  }catch(error){if(epoch===state.epoch&&$('#main'))$('#main').insertAdjacentHTML('beforeend',`<div class="empty-state"><p>${esc(error.message)}</p><br><button class="button" data-action="refresh">Erneut laden</button></div>`);}
 }
 function productForm(id) {
   const p=id?state.allProducts.find(p=>p.id===id):{name:'',description:'',category:'Cocktails',price_cents:0,active:true};
@@ -241,13 +234,12 @@ async function orderDetails(id) {
   }catch(error){toast(error.message,true);}
 }
 function voidForm(id) {
-  openModal(`${modalHead('Buchung stornieren','Der Verkauf wird aus dem Umsatz herausgerechnet. Die Buchung bleibt nachvollziehbar.','Verwaltung')}<form class="modal-body" id="void-form">${!state.admin?'<div class="field"><label for="void-pin">Verwaltungs-PIN</label><input id="void-pin" name="pin" type="password" inputmode="numeric" minlength="4" maxlength="12" required autocomplete="off"></div>':''}<div class="field"><label for="void-reason">Grund für das Storno</label><textarea id="void-reason" name="reason" rows="3" minlength="3" maxlength="200" placeholder="z. B. Bestellung versehentlich doppelt erfasst" required></textarea></div><p id="void-error" class="error" role="alert"></p><div class="modal-actions"><button class="button" type="button" data-action="close-modal">Abbrechen</button><button class="button danger" type="submit">Storno bestätigen</button></div></form>`);
+  openModal(`${modalHead('Buchung stornieren','Der Verkauf wird aus dem Umsatz herausgerechnet. Die Buchung bleibt nachvollziehbar.','Verwaltung')}<form class="modal-body" id="void-form"><div class="field"><label for="void-reason">Grund für das Storno</label><textarea id="void-reason" name="reason" rows="3" minlength="3" maxlength="200" placeholder="z. B. Bestellung versehentlich doppelt erfasst" required></textarea></div><p id="void-error" class="error" role="alert"></p><div class="modal-actions"><button class="button" type="button" data-action="close-modal">Abbrechen</button><button class="button danger" type="submit">Storno bestätigen</button></div></form>`);
   $('#void-form').addEventListener('submit',async event=>{
     event.preventDefault();const form=event.currentTarget,button=$('button[type=submit]',form);button.disabled=true;
     try{
-      if(!state.admin){await api('/admin/unlock',{method:'POST',body:{pin:form.elements.pin.value}});state.admin=true;}
       await api(`/orders/${encodeURIComponent(id)}/void`,{method:'POST',body:{reason:form.elements.reason.value}});modal.close();toast('Buchung storniert. Die Umsatzsummen wurden angepasst.');await renderPage();
-    }catch(error){if(error.status===403)voidForm(id);if($('#void-error'))$('#void-error').textContent=error.message;button.disabled=false;}
+    }catch(error){if($('#void-error'))$('#void-error').textContent=error.message;button.disabled=false;}
   });
 }
 async function action(button) {
@@ -258,7 +250,7 @@ async function action(button) {
     case 'refresh':await renderPage();break;
     case 'logout':
       if(state.pending||state.busy){toast('Bitte zuerst den offenen Buchungsstatus prüfen.',true);return;}
-      saveDraft();await api('/logout',{method:'POST',body:{}});state.employee=null;state.admin=false;state.epoch++;renderLogin();break;
+      saveDraft();await api('/logout',{method:'POST',body:{}});state.employee=null;state.epoch++;renderLogin();break;
     case 'category':state.category=button.dataset.category;renderCategories();renderProducts();break;
     case 'select-product':selectProduct(id);break;
     case 'close-modal':modal.close();break;
@@ -299,7 +291,7 @@ window.addEventListener('offline',()=>connection(false));
 setInterval(async()=>{
   if(!state.employee||document.hidden||modal.open||state.busy)return;
   try{
-    const me=await api('/me');state.admin=me.admin;
+    await api('/me');
     if(state.view==='kasse'){
       const [{products}]=await Promise.all([api('/products'),refreshMetrics()]);
       if(JSON.stringify(products)!==JSON.stringify(state.products)){state.products=products;if($('#product-grid')){renderCategories();renderProducts();}}
@@ -310,7 +302,7 @@ async function initialize() {
   setPeriod('today');
   try{
     state.config=await api('/config');
-    try{const me=await api('/me');state.employee=me.employee;state.admin=me.admin;}catch(error){if(error.status!==401)throw error;}
+    try{const me=await api('/me');state.employee=me.employee;}catch(error){if(error.status!==401)throw error;}
     if(state.employee){restoreDraft();await startApp();}else renderLogin();
   }catch(error){
     $('#app').innerHTML=`<main class="fatal-error"><h1>Die Bar ist noch nicht erreichbar.</h1><p>${esc(error.message)}</p><button class="button gold" id="retry-connect">Erneut verbinden</button></main>`;
