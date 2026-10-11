@@ -1,0 +1,4 @@
+/* Lokale Systemschriften: keine externen Dienste oder Font-Downloads. */
+@font-face{font-family:'Bar Serif';src:local('Georgia');font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:'Bar Serif';src:local('Georgia Italic');font-weight:400;font-style:italic;font-display:swap}
+@font-face{font-family:'Bar Sans';src:local('Segoe UI');font-weight:100 900;font-display:swap}
