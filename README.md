@@ -50,6 +50,16 @@ Die Konfiguration verwendet zunächst kostenlose Render-Instanzen. **Die kostenl
 
 Die Bereitstellungsvorlage folgt der [Render-Blueprint-Referenz](https://render.com/docs/blueprint-spec). Startbefehl ist `npm start`, Buildbefehl `npm ci --omit=dev`, Healthcheck `/api/health`. Die Node-Version wird auf die Major-Version 22 gesetzt.
 
+## Wenn Render beim Start fehlschlägt
+
+Ein erfolgreicher Build bestätigt die Installation. Fehlende Zugangswerte müssen zusätzlich im Web Service unter **Environment** gesetzt werden. Der Start-Log nennt jetzt jeden fehlenden oder ungültigen Wert einzeln:
+
+- `ADMIN_PIN`: 4–12 Ziffern. Umgebende Leerzeichen beim Kopieren werden ignoriert.
+- `BAR_ACCESS_CODE`: eigener Zugangscode mit mindestens vier Zeichen. Der eingegebene Code muss dem konfigurierten Wert entsprechen.
+- `DATABASE_URL`: die vollständige PostgreSQL-Verbindungsadresse. Der Blueprint trägt sie automatisch ein; falls sie fehlt, die **Internal Database URL** der angelegten Render-Datenbank verwenden.
+
+Nach dem Korrigieren die Einstellungen speichern und erneut deployen. Ein GitHub-Push ersetzt diese Render-Einstellungen nicht. Die Meldung `.env not found. Continuing without it.` ist auf Render normal: Dort kommen die Werte direkt aus den Environment-Einstellungen.
+
 ## Bedienung
 
 1. Mit eurem Namen anmelden. Bitte immer denselben Namen verwenden; verschiedene Namen erscheinen als verschiedene Mitarbeiter.
