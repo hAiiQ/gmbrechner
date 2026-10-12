@@ -90,9 +90,9 @@ Neue Verkäufe buchen Bestand und Umsatz gemeinsam in einer Datenbanktransaktion
 Unter **VIP** liegen die Vermietungen außerhalb des Artikelwarenkorbs:
 
 - **VIP Lounge:** 50.000 $ pro Stunde.
-- **Oberer Bereich:** 100.000 $ pro Woche oder 250.000 $ pro Kalendermonat.
+- **Oberer Bereich:** 100.000 $ für genau 1 Woche oder 250.000 $ für genau 4 Wochen.
 
-Im Buchungsfenster Name, optional Familie, Nummer, Beginn, Tarif und Dauer angeben. Die Dauer ist eine ganze Anzahl von 1 bis 52 Stunden/Wochen/Monaten. Der Server berechnet Enddatum und Preis; die Vorschau zeigt beides vor dem Speichern. Wochen und Monate behalten die Berliner Uhrzeit bei Zeitumstellungen bei. Kalendermonate enden bei einem fehlenden Monatstag am letzten Tag des Monats (z. B. 31. Januar → 28. Februar).
+Im Buchungsfenster Name, optional Familie, Nummer, Beginn und Tarif angeben. Beim Oberen Bereich gibt es ausschließlich die beiden festen Laufzeiten 1 Woche und 4 Wochen; ein Dauerfeld entfällt. Der Server setzt die Laufzeit automatisch und berechnet Enddatum und Preis. Die VIP Lounge bleibt stundenweise mit einer Dauer von 1 bis 52 Stunden buchbar. Die Vorschau zeigt Zeitraum und Preis vor dem Speichern. Wochen behalten die Berliner Uhrzeit bei Zeitumstellungen bei. Bereits gespeicherte Vermietungen behalten ihren ursprünglichen Zeitraum und Preis.
 
 Die VIP-Seite zeigt Name, Familie, Nummer, Beginn, Ende, Preis, Mitarbeiter und Status. Suchbar und filterbar nach aktiv/geplant, beendet, storniert oder allen Vermietungen. Überschneidungen im selben Bereich sind gesperrt. **Beim Buchen wird die gesamte Miete als Einnahme am Buchungstag in Finanzen erfasst**; bei Bedarf erst nach dem Zahlungseingang buchen. Vermietungsstornos mit Grund geben den Zeitraum frei und stornieren die verknüpfte Einnahme gemeinsam.
 
@@ -113,6 +113,6 @@ npm run check
 npm test
 ```
 
-Die Integrationstests prüfen Berechnung und Mitarbeiterzuordnung, doppelte und gleichzeitige Requests, Preisänderungen, ungültige Mengen, Stornos, Berliner Tagesgrenzen, CSV und dauerhafte lokale Speicherung. Zusätzlich prüfen sie die 24 Foto-Bestände, konkurrierende Verkäufe, Stock-Stornos, einmalige Datenmigration, Miettarife, Monatsenden, Sommerzeit, Reservierungskonflikte sowie Finanzsummen und -stornos. Sie verwenden eigene isolierte Testdatenbanken.
+Die Integrationstests prüfen Berechnung und Mitarbeiterzuordnung, doppelte und gleichzeitige Requests, Preisänderungen, ungültige Mengen, Stornos, Berliner Tagesgrenzen, CSV und dauerhafte lokale Speicherung. Zusätzlich prüfen sie die 24 Foto-Bestände, konkurrierende Verkäufe, Stock-Stornos, einmalige Datenmigration, feste Miettarife, Wochenlaufzeiten, Sommerzeit, Reservierungskonflikte sowie Finanzsummen und -stornos. Sie verwenden eigene isolierte Testdatenbanken.
 
 Dateien: `server.js` startet die App; `lib/app.js` enthält die API; `lib/database.js` verwaltet Datenbank und Tabellen; `public/` enthält die Oberfläche; `render.yaml` bereitet das Hosting vor.

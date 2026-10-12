@@ -96,13 +96,36 @@ test('Lager, Vermietungen und Finanzen mit echter Datenbank',async t=>{
     const result=await call('/rentals',body);assert.equal(result.status,201);assert.equal(result.data.rental.total_cents,10000000);assert.equal(result.data.rental.family,'');
     assert.equal(result.data.rental.ends_at,'2026-11-08T17:00:00.000Z');
   });
-  await t.test('Monatstarif, Monatsende und Sommerzeit; ungültige Zeiträume abgelehnt',async()=>{
-    const q=(await call('/rentals/quote',{space:'upper',unit:'month',quantity:1,start:'2027-01-31T18:00'})).data.quote;
-    assert.equal(q.total_cents,25000000);assert.equal(q.ends_at,'2027-02-28T17:00:00.000Z');
-    const week=(await call('/rentals/quote',{space:'upper',unit:'week',quantity:1,start:'2027-03-27T18:00'})).data.quote;
+  await t.test('Oberer Bereich hat feste 1- oder 4-Wochen-Tarife, auch über Sommerzeit und Monatsgrenzen',async()=>{
+    const q=(await call('/rentals/quote',{space:'upper',unit:'four_weeks',start:'2027-04-01T18:00'})).data.quote;
+    assert.equal(q.total_cents,25000000);assert.equal(q.ends_at,'2027-04-29T16:00:00.000Z');
+    assert.equal(q.unit,'week');assert.equal(q.quantity,4);assert.equal(q.rate_cents*q.quantity,q.total_cents);
+    const week=(await call('/rentals/quote',{space:'upper',unit:'week',start:'2027-03-27T18:00'})).data.quote;
     assert.equal(week.starts_at,'2027-03-27T17:00:00.000Z');assert.equal(week.ends_at,'2027-04-03T16:00:00.000Z');
+    assert.equal(week.quantity,1);assert.equal(week.total_cents,10000000);
+    const tampered=(await call('/rentals/quote',{space:'upper',unit:'four_weeks',quantity:99,start:'2027-04-01T18:00'})).data.quote;
+    assert.equal(tampered.quantity,4);assert.equal(tampered.total_cents,25000000);assert.equal(tampered.ends_at,q.ends_at);
+    const booked=await call('/rentals',{space:'upper',unit:'four_weeks',start:'2027-04-01T18:00',id:randomUUID(),customer_name:'Vier Wochen',phone:'555-0100'});
+    assert.equal(booked.status,201);assert.equal(booked.data.rental.quantity,4);assert.equal(booked.data.rental.total_cents,25000000);assert.equal(booked.data.rental.ends_at,q.ends_at);
+    assert.equal((await call('/rentals/quote',{space:'upper',unit:'month',start:'2027-04-01T18:00'})).status,400);
+    assert.equal((await call('/rentals/quote',{space:'upper',unit:'toString',start:'2027-04-01T18:00'})).status,400);
     for(const body of [{...vip,start:'2027-02-30T18:00'},{...vip,start:'2027-03-28T02:30'},{...vip,unit:'week'},{...vip,quantity:0},{...vip,start:'kein Datum'}])assert.equal((await call('/rentals/quote',body)).status,400);
     assert.equal((await call('/rentals',{...vip,id:randomUUID(),phone:''})).status,400);
+  });
+  await t.test('Bereits gespeicherte Monatsmiete und ihre Einnahme bleiben nach dem Tarifwechsel erhalten',async()=>{
+    const id=randomUUID(),entryId=randomUUID();
+    await db.query(`INSERT INTO rentals (id,employee_id,space,customer_name,family,phone,starts_at,ends_at,unit,quantity,rate_cents,total_cents,currency)
+      SELECT $1,employee_id,space,'Bestehender Gast',family,phone,'2029-01-01 17:00:00+00','2029-02-01 17:00:00+00','month',1,25000000,25000000,currency FROM rentals WHERE id=$2`,[id,upperId]);
+    await db.query(`INSERT INTO finance_entries (id,employee_id,rental_id,kind,amount_cents,reason,occurred_on)
+      SELECT $1,employee_id,id,'income',total_cents,'Bestehende Monatsmiete','2026-10-12' FROM rentals WHERE id=$2`,[entryId,id]);
+    const before=(await call('/rentals')).data.rentals.find(r=>r.id===id);
+    await initializeDatabase(db);
+    const retry=await call('/rentals',{...vip,id,space:'upper',unit:'month',quantity:1});
+    assert.equal(retry.status,201);assert.equal(retry.data.rental.unit,'month');
+    assert.equal(retry.data.rental.ends_at,before.ends_at);assert.equal(retry.data.rental.total_cents,25000000);
+    const after=(await call('/rentals')).data.rentals.find(r=>r.id===id);assert.deepEqual(after,before);
+    const money=await db.query('SELECT amount_cents FROM finance_entries WHERE rental_id=$1',[id]);
+    assert.equal(money.rows.length,1);assert.equal(money.rows[0].amount_cents,25000000);
   });
   await t.test('Vermietungsstorno gibt den Zeitraum frei und storniert die Einnahme einmal',async()=>{
     const f=(await db.query('SELECT id FROM finance_entries WHERE rental_id=$1',[vipId])).rows[0].id;
