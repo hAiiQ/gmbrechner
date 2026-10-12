@@ -28,6 +28,7 @@ test('Speise- und Shishakarte: Erstinstallation, Migration und Historie',async t
   await t.test('Bestehende Euro-Verkäufe bleiben erhalten und werden getrennt von Dollar-Umsätzen summiert',async()=>{
     // Zustand einer früheren Installation mit Beispielkarte und eigenen Artikeln.
     await db.query('DELETE FROM schema_migrations');
+    await db.query('DELETE FROM stock_movements');
     await db.query("DELETE FROM products WHERE id<>'cola'");
     await db.query("UPDATE products SET price_cents=350,category='Alkoholfrei' WHERE id='cola'");
     await db.query("INSERT INTO products (id,name,category,price_cents) VALUES ('old-fashioned','Old Fashioned','Cocktails',1200),('custom','Eigener Artikel','Essen',99900)");
@@ -70,7 +71,7 @@ test('Speise- und Shishakarte: Erstinstallation, Migration und Historie',async t
     await initializeDatabase(db);
     assert.equal((await db.query("SELECT price_cents FROM products WHERE id='cola'")).rows[0].price_cents,42000);
     assert.equal((await db.query("SELECT active FROM products WHERE id='magische-e-shisha'")).rows[0].active,false);
-    assert.equal((await db.query('SELECT COUNT(*)::int AS count FROM schema_migrations')).rows[0].count,1);
+    assert.equal((await db.query('SELECT COUNT(*)::int AS count FROM schema_migrations')).rows[0].count,2);
     assert.equal((await db.query('SELECT COUNT(*)::int AS count FROM orders')).rows[0].count,2);
   });
 });

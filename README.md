@@ -11,12 +11,15 @@ Eine responsive Kasse in Schwarz, Oliv und Gold, gestaltet mit eurem Emblem und 
 - Buchungsdetails, meistverkaufte Artikel und CSV-Export aller Positionen im gewählten Zeitraum.
 - Artikelverwaltung für alle angemeldeten Mitarbeiter: Preise ändern, Artikel hinzufügen und pausieren.
 - Storno mit Begründung. Die ursprüngliche Buchung bleibt sichtbar und zählt nicht mehr zum Umsatz.
+- Lagerbestand mit Warnungen unter 30 Stück, automatischem Abzug bei Verkäufen, Rückgabe bei Storno und Bestandsänderungen mit Grund.
+- Separate VIP-Seite für VIP Lounge und Oberen Bereich mit Kundendaten, Mietzeitraum und automatischer Mieteinnahme.
+- Finanzen mit sonstigen Einnahmen, Ausgaben, Pflichtgrund, Stornos und Gesamtsaldo.
 - Zentrale PostgreSQL-Datenbank auf Render für mehrere Geräte. Doppelte Buchungsanfragen werden abgefangen.
 - Ein lokal gespeicherter Warenkorb pro Mitarbeiter. Bei Verbindungsabbruch bleibt eine offene Buchung gesperrt, bis ihr ihren Status über „Buchung prüfen“ erneut prüft.
 
 Die Kasse enthält **24 Artikel aus eurer Speise- und Shishakarte** mit den bestätigten **Dollarpreisen (USD)**. Dazu gehören Essen, alkoholische und alkoholfreie Getränke, Kaffeespezialitäten, Zigaretten & Zigarren, Spezielles, die Magische E-Shisha und sieben Aromen. Die Preise 250 bzw. 5.000 auf den Karten werden als **250 $ bzw. 5.000 $** übernommen. Artikel und Preise bleiben unter „Sortiment“ bearbeitbar.
 
-Beim ersten Start mit dieser Version wird die Karte auch in bestehenden Datenbanken automatisch eingespielt. Alte Beispielartikel werden pausiert; selbst angelegte zusätzliche Artikel bleiben erhalten. Die Umstellung auf die echte Karte erfolgt einmalig. Weitere Starts oder Deployments überschreiben eure späteren Preisänderungen nicht.
+Beim ersten Start mit dieser Version wird die Karte auch in bestehenden Datenbanken automatisch eingespielt. Alte Beispielartikel werden aus Kasse und Sortiment archiviert; selbst angelegte zusätzliche Artikel bleiben erhalten. Die Umstellung auf die echte Karte erfolgt einmalig. Weitere Starts oder Deployments überschreiben eure späteren Preisänderungen nicht.
 
 Neue Verkäufe werden nach dem Kartenimport in USD gebucht. Bestehende Buchungen behalten ihre ursprünglichen Artikel, Preise und Währungen. Falls noch Euro-Umsätze aus der vorherigen Version vorhanden sind, könnt ihr in „Umsätze“ zwischen Dollar und Euro wählen. Die Summen werden je Währung getrennt berechnet; es findet keine Währungsumrechnung statt. Nach dem ersten Verkauf lässt sich die Währung über „Sortiment“ nicht mehr ändern.
 
@@ -74,6 +77,33 @@ Preisänderungen betreffen neue Verkäufe. Enthält ein offener Warenkorb einen 
 
 Die CSV-Datei lässt sich mit Excel öffnen und verwendet Semikolon als Trennzeichen sowie Komma als Dezimalzeichen. Jeder Datensatz ist eine Artikelposition. Status „Storniert“ beim Weiterrechnen herausfiltern. Der Export aus der Umsatzübersicht enthält alle Buchungen des gewählten Zeitraums und der ausgewählten Währung, während die Oberfläche nur die neuesten 50 Buchungen auflistet. Für Datenbanksicherungen zusätzlich die Export-/Backupmöglichkeiten eures PostgreSQL-Anbieters nutzen; der CSV-Export ist kein vollständiges Datenbank-Backup.
 
+## Lagerbestand
+
+Der erste Deploy dieser Erweiterung übernimmt **einmalig die 24 Bestände aus den Lagerbildern**: ausschließlich die Stückzahlen oben rechts, gleiche Artikel addiert. Die Grammangaben und die drei zusätzlichen Felder Orange Eclipse / Moonfire werden ausgelassen. Insgesamt sind es 1.196 Stück. Weitere Deployments ändern weder diese Bestände noch manuelle Inventuren. Die früheren Beispielartikel sind auch aus der Sortimentsverwaltung entfernt; die Datensätze bleiben für alte Buchungen erhalten.
+
+Unter **Lager** seht ihr alle Bestände und könnt nach Artikeln suchen oder nur niedrige Bestände anzeigen. **Unter 30 Stück** erscheint eine Warnung; genau 30 zählt als ausreichend. In der Kasse stehen die Bestände direkt am Artikel. Bestand 0 sperrt den Verkauf. Alle Ansichten prüfen alle 30 Sekunden auf neu unterschrittene Bestände, die Kasse und das Lager aktualisieren ihre Bestandsanzeigen automatisch. Über **Bestand ändern** den neuen gesamten Bestand und einen Grund eingeben (Nachlieferung, Inventur, Bruch usw.). Das Bewegungsprotokoll erfasst Änderung, Bestand danach, Grund und Mitarbeiter.
+
+Neue Verkäufe buchen Bestand und Umsatz gemeinsam in einer Datenbanktransaktion. Überverkauf und doppelte Abbuchungen durch wiederholte Anfragen werden verhindert. Ein Storno neuer Verkäufe gibt die Menge einmal zurück. Buchungen, die bereits vor Einführung des Lagers bestanden, wurden in der Foto-Inventur berücksichtigt und erhöhen beim Storno deshalb nicht nachträglich den Bestand.
+
+## VIP und Vermietung
+
+Unter **VIP** liegen die Vermietungen außerhalb des Artikelwarenkorbs:
+
+- **VIP Lounge:** 50.000 $ pro Stunde.
+- **Oberer Bereich:** 100.000 $ pro Woche oder 250.000 $ pro Kalendermonat.
+
+Im Buchungsfenster Name, optional Familie, Nummer, Beginn, Tarif und Dauer angeben. Die Dauer ist eine ganze Anzahl von 1 bis 52 Stunden/Wochen/Monaten. Der Server berechnet Enddatum und Preis; die Vorschau zeigt beides vor dem Speichern. Wochen und Monate behalten die Berliner Uhrzeit bei Zeitumstellungen bei. Kalendermonate enden bei einem fehlenden Monatstag am letzten Tag des Monats (z. B. 31. Januar → 28. Februar).
+
+Die VIP-Seite zeigt Name, Familie, Nummer, Beginn, Ende, Preis, Mitarbeiter und Status. Suchbar und filterbar nach aktiv/geplant, beendet, storniert oder allen Vermietungen. Überschneidungen im selben Bereich sind gesperrt. **Beim Buchen wird die gesamte Miete als Einnahme am Buchungstag in Finanzen erfasst**; bei Bedarf erst nach dem Zahlungseingang buchen. Vermietungsstornos mit Grund geben den Zeitraum frei und stornieren die verknüpfte Einnahme gemeinsam.
+
+## Finanzen
+
+Unter **Finanzen** sonstige Einnahmen und Ausgaben in Dollar erfassen: positiver Betrag, Buchungsdatum und Grund sind Pflicht. Der Mitarbeiter wird aus der Anmeldung übernommen. Einträge bleiben bei Storno sichtbar, zählen aber nicht mehr zu den Summen. Mietbeträge werden automatisch erfasst und dürfen nicht zusätzlich als sonstige Einnahme gebucht werden.
+
+Die Übersicht zeigt Kassenumsatz, Vermietungen, sonstige Einnahmen, Ausgaben, gesamte Einnahmen und **Saldo = Kassenumsatz + Vermietungen + sonstige Einnahmen − Ausgaben**. Zeitraumfilter begrenzen Summen und Liste; Euro-Altumsätze werden nicht mit Dollarbeträgen vermischt. Das ist eine Einnahmen-/Ausgabenübersicht, keine automatische Gewinn- oder Steuerberechnung. Die letzten 200 Finanzbuchungen werden angezeigt. Vermietungen werden auf der VIP-Seite storniert.
+
+Offene Lager-/VIP-/Finanzanfragen bleiben bei Verbindungsfehlern mit derselben Buchungsnummer im Browser gespeichert. Über **Buchung prüfen** wird das Ergebnis sicher abgefragt, bevor eine neue Buchung erfasst werden kann.
+
 ## Technik und Prüfung
 
 Node.js, Express, PostgreSQL (`pg`), lokale PostgreSQL-Engine (`PGlite`), HTML/CSS/JavaScript ohne Buildschritt. Bilder und Schriften laden ohne externe Dienste. Buchungsbeträge werden serverseitig aus aktuellen Preisen berechnet, Mitarbeitende werden aus der Sitzung zugeordnet. Sitzungen verwenden HttpOnly-Cookies, im Produktionsmodus HTTPS. Die Artikelverwaltung ist für alle angemeldeten Mitarbeiter offen. Die Namensanmeldung identifiziert den Mitarbeiter anhand seiner Eingabe, nicht über ein persönliches Passwort.
@@ -83,6 +113,6 @@ npm run check
 npm test
 ```
 
-Die Integrationstests prüfen Berechnung und Mitarbeiterzuordnung, doppelte und gleichzeitige Requests, Preisänderungen, ungültige Mengen, Stornos, Berliner Tagesgrenzen, CSV und dauerhafte lokale Speicherung. Sie verwenden eigene isolierte Testdatenbanken.
+Die Integrationstests prüfen Berechnung und Mitarbeiterzuordnung, doppelte und gleichzeitige Requests, Preisänderungen, ungültige Mengen, Stornos, Berliner Tagesgrenzen, CSV und dauerhafte lokale Speicherung. Zusätzlich prüfen sie die 24 Foto-Bestände, konkurrierende Verkäufe, Stock-Stornos, einmalige Datenmigration, Miettarife, Monatsenden, Sommerzeit, Reservierungskonflikte sowie Finanzsummen und -stornos. Sie verwenden eigene isolierte Testdatenbanken.
 
 Dateien: `server.js` startet die App; `lib/app.js` enthält die API; `lib/database.js` verwaltet Datenbank und Tabellen; `public/` enthält die Oberfläche; `render.yaml` bereitet das Hosting vor.

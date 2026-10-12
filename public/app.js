@@ -36,7 +36,7 @@ const drawings = {
 const icon = (name,cls='') => `<svg class="icon ${cls}" viewBox="0 0 24 24" aria-hidden="true">${drawings[name]||drawings.glass}</svg>`;
 const categoryIcon = category => ({Essen:'food','Alkoholische Getränke':'whiskey','Alkoholfreie Getränke':'water','Kaffeespezialitäten':'coffee','Zigaretten & Zigarren':'cigar',Spezielles:'wine',Shisha:'shisha',Aromen:'aroma',Cocktails:'cocktail',Longdrinks:'glass',Spirituosen:'whiskey','Bier & Wein':'wine',Alkoholfrei:'water',Snacks:'snack'}[category] || 'glass');
 const initials = name => name.trim().split(/\s+/).slice(0,2).map(s=>s[0]).join('').toUpperCase();
-const state = { config:null,employee:null,view:'kasse',products:[],cart:[],payment:'cash',requestId:null,pending:null,category:'Alle',search:'',period:'today',from:null,to:null,statsCurrency:null,connected:true,busy:false,epoch:0,lastOrder:null };
+const state = { config:null,employee:null,view:'kasse',products:[],cart:[],payment:'cash',requestId:null,pending:null,operationPending:null,category:'Alle',search:'',period:'today',from:null,to:null,statsCurrency:null,connected:true,busy:false,epoch:0,lastOrder:null };
 const modal = $('#modal');
 let toastTimer;
 function toast(message,error=false) {
@@ -84,15 +84,15 @@ async function api(url,{method='GET',body}={}) {
 }
 function saveDraft() {
   if(!state.employee)return;
-  try {localStorage.setItem(`gentlemans-cart-${state.employee.id}`,JSON.stringify({cart:state.cart,payment:state.payment,requestId:state.requestId,pending:state.pending}));} catch {/* Die zentrale Buchung bleibt unabhängig vom lokalen Warenkorb. */}
+  try {localStorage.setItem(`gentlemans-cart-${state.employee.id}`,JSON.stringify({cart:state.cart,payment:state.payment,requestId:state.requestId,pending:state.pending,operationPending:state.operationPending}));} catch {/* Die zentrale Buchung bleibt unabhängig vom lokalen Warenkorb. */}
 }
 function restoreDraft() {
-  state.cart=[];state.payment='cash';state.requestId=crypto.randomUUID();state.pending=null;state.lastOrder=null;
+  state.cart=[];state.payment='cash';state.requestId=crypto.randomUUID();state.pending=null;state.operationPending=null;state.lastOrder=null;
   try {
     const saved=JSON.parse(localStorage.getItem(`gentlemans-cart-${state.employee.id}`)||'null');
     if(saved && Array.isArray(saved.cart)){
       state.cart=saved.cart.filter(p=>p && typeof p.id==='string' && typeof p.name==='string' && Number.isInteger(p.price_cents) && Number.isInteger(p.quantity) && p.quantity>0 && p.quantity<=999);
-      state.payment=['cash','card'].includes(saved.payment)?saved.payment:'cash';state.requestId=saved.requestId||crypto.randomUUID();state.pending=saved.pending||null;
+      state.payment=['cash','card'].includes(saved.payment)?saved.payment:'cash';state.requestId=saved.requestId||crypto.randomUUID();state.pending=saved.pending||null;state.operationPending=saved.operationPending||null;
     }
   }catch{}
 }
@@ -108,14 +108,14 @@ function renderLogin() {
   });
 }
 function shell() {
-  $('#app').innerHTML=`<header class="app-header">${brand()}<nav class="nav" aria-label="Hauptnavigation">${[['kasse','register','Kasse'],['stats','chart','Umsätze'],['admin','box','Sortiment']].map(([view,name,label])=>`<button data-action="navigate" data-view="${view}" class="${state.view===view?'active':''}" ${state.view===view?'aria-current="page"':''}>${icon(name)}${label}</button>`).join('')}</nav><div class="user-area"><div class="avatar">${esc(initials(state.employee.name))}</div><div><div class="user-name">${esc(state.employee.name)}</div><div class="user-role">Angemeldet · Mitarbeiter</div></div><button class="icon-button" data-action="logout" aria-label="Abmelden" title="Abmelden">${icon('logout')}</button></div></header><main id="main" class="main"></main><footer class="app-footer"><span class="footer-mark">${icon('cocktail')}GENTLEMANS BAR · GRAPESEED</span><span>GUTE GESELLSCHAFT. KLARE ABRECHNUNG.</span></footer>`;
+  $('#app').innerHTML=`<header class="app-header">${brand()}<nav class="nav" aria-label="Hauptnavigation">${[['kasse','register','Kasse'],['stats','chart','Umsätze'],['inventory','box','Lager'],['vip','wine','VIP'],['finance','coin','Finanzen'],['admin','edit','Sortiment']].map(([view,name,label])=>`<button data-action="navigate" data-view="${view}" class="${state.view===view?'active':''}" ${state.view===view?'aria-current="page"':''}>${icon(name)}${label}</button>`).join('')}</nav><div class="user-area"><div class="avatar">${esc(initials(state.employee.name))}</div><div><div class="user-name">${esc(state.employee.name)}</div><div class="user-role">Angemeldet · Mitarbeiter</div></div><button class="icon-button" data-action="logout" aria-label="Abmelden" title="Abmelden">${icon('logout')}</button></div></header><div id="operation-recovery"></div><main id="main" class="main"></main><footer class="app-footer"><span class="footer-mark">${icon('cocktail')}GENTLEMANS BAR · GRAPESEED</span><span>GUTE GESELLSCHAFT. KLARE ABRECHNUNG.</span></footer>`;
 }
 function pageHeading(title,subtitle,eyebrow='Hinter der Bar') {
   const formatted=new Intl.DateTimeFormat('de-DE',{timeZone:'Europe/Berlin',weekday:'long',day:'numeric',month:'long'}).format(new Date());
   return `<div class="page-heading"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1><p>${subtitle}</p></div><div class="date-status">${esc(formatted)}<div id="connection" class="connection${state.connected?'':' offline'}"><span class="status-dot"></span>${state.connected?'Zentral verbunden':'Verbindung unterbrochen'}</div></div></div>`;
 }
 async function startApp() {
-  try{const result=await api('/products');state.products=result.products;shell();await renderPage();}
+  try{const result=await api('/products');state.products=result.products;shell();recoveryNotice();await renderPage();}
   catch(error){if(state.employee){shell();$('#main').innerHTML=`<div class="empty-state">${icon('info')}<h3>Die Kasse wartet kurz.</h3><p>${esc(error.message)}</p><br><button class="button gold" data-action="reload">Erneut verbinden</button></div>`;}}
 }
 async function renderPage() {
@@ -125,9 +125,12 @@ async function renderPage() {
   if(state.view==='kasse'){renderKasse();refreshMetrics().catch(()=>{});}
   if(state.view==='stats')await renderStats(epoch);
   if(state.view==='admin')await renderAdmin(epoch);
+  if(state.view==='inventory')await renderInventory(epoch);
+  if(state.view==='vip')await renderVIP(epoch);
+  if(state.view==='finance')await renderFinance(epoch);
 }
 function renderKasse() {
-  $('#main').innerHTML=`${pageHeading('Die Kasse.','Alles im Glas. Alles im Blick.')}<div class="kasse-layout"><section class="catalog" aria-label="Artikel auswählen"><div class="quick-metrics"><div class="quick-metric"><div class="metric-label">${icon('chart')}Umsatz heute</div><strong id="today-total">—</strong></div><div class="quick-metric"><div class="metric-label">${icon('user')}Dein Umsatz heute</div><strong id="own-total">—</strong></div><div class="quick-metric"><div class="metric-label">${icon('receipt')}Verkäufe heute</div><strong id="today-count">—</strong></div></div><div class="catalog-header"><h2 class="section-title">Unsere Karte <span class="item-count">${state.products.length} Artikel</span></h2><div class="search">${icon('search')}<input id="article-search" type="search" placeholder="Artikel suchen …" aria-label="Artikel suchen" value="${esc(state.search)}"></div></div><div id="categories" class="categories" aria-label="Artikelkategorien"></div><div id="product-grid" class="product-grid"></div><p class="catalog-note">${icon('info')}Artikel auswählen, Menge angeben und zur Bestellung hinzufügen.</p></section><aside id="receipt" class="receipt" aria-label="Aktuelle Bestellung"></aside></div><div id="mobile-cart-bar" class="mobile-cart-bar"></div>`;
+  $('#main').innerHTML=`${pageHeading('Die Kasse.','Alles im Glas. Alles im Blick.')}<div class="kasse-layout"><section class="catalog" aria-label="Artikel auswählen"><div class="quick-metrics"><div class="quick-metric"><div class="metric-label">${icon('chart')}Umsatz heute</div><strong id="today-total">—</strong></div><div class="quick-metric"><div class="metric-label">${icon('user')}Dein Umsatz heute</div><strong id="own-total">—</strong></div><div class="quick-metric"><div class="metric-label">${icon('receipt')}Verkäufe heute</div><strong id="today-count">—</strong></div></div><div id="stock-notice">${stockNotice()}</div><div class="catalog-header"><h2 class="section-title">Unsere Karte <span class="item-count">${state.products.length} Artikel</span></h2><div class="search">${icon('search')}<input id="article-search" type="search" placeholder="Artikel suchen …" aria-label="Artikel suchen" value="${esc(state.search)}"></div></div><div id="categories" class="categories" aria-label="Artikelkategorien"></div><div id="product-grid" class="product-grid"></div><p class="catalog-note">${icon('info')}Artikel auswählen, Menge angeben und zur Bestellung hinzufügen.</p></section><aside id="receipt" class="receipt" aria-label="Aktuelle Bestellung"></aside></div><div id="mobile-cart-bar" class="mobile-cart-bar"></div>`;
   renderCategories();renderProducts();renderCart();
   $('#article-search').addEventListener('input',event=>{state.search=event.target.value;renderProducts();});
 }
@@ -138,7 +141,7 @@ function renderCategories() {
 }
 function renderProducts() {
   const products=state.products.filter(p=>(state.category==='Alle'||p.category===state.category)&&`${p.name} ${p.description} ${p.category}`.toLocaleLowerCase('de-DE').includes(state.search.toLocaleLowerCase('de-DE')));
-  $('#product-grid').innerHTML=products.length?products.map(p=>`<button class="product" data-action="select-product" data-id="${esc(p.id)}" ${state.pending?'disabled':''} aria-label="${esc(p.name)}, ${esc(money(p.price_cents))}, Menge auswählen"><span class="product-icon">${icon(categoryIcon(p.category))}</span><span class="product-copy"><span class="product-name">${esc(p.name)}</span><span class="product-desc">${esc(p.description)}</span><span class="product-price">${money(p.price_cents)}</span></span><span class="product-plus">${icon('plus')}</span></button>`).join(''):`<div class="empty-state">${icon('search')}<h3>Hier ist es noch leer.</h3><p>${state.products.length?'Kein Artikel passt zu deiner Suche.':'Füge in der Verwaltung die ersten Artikel hinzu.'}</p></div>`;
+  $('#product-grid').innerHTML=products.length?products.map(p=>`<button class="product" data-action="select-product" data-id="${esc(p.id)}" ${state.pending||p.stock_quantity===0?'disabled':''} aria-label="${esc(p.name)}, ${esc(money(p.price_cents))}, Menge auswählen"><span class="product-icon">${icon(categoryIcon(p.category))}</span><span class="product-copy"><span class="product-name">${esc(p.name)}</span><span class="product-desc">${esc(p.description)}</span>${stockBadge(p)}<span class="product-price">${money(p.price_cents)}</span></span><span class="product-plus">${icon('plus')}</span></button>`).join(''):`<div class="empty-state">${icon('search')}<h3>Hier ist es noch leer.</h3><p>${state.products.length?'Kein Artikel passt zu deiner Suche.':'Füge in der Verwaltung die ersten Artikel hinzu.'}</p></div>`;
 }
 function cartTotal(){return state.cart.reduce((sum,p)=>sum+p.quantity*p.price_cents,0);}
 function renderCart() {
@@ -161,8 +164,8 @@ function modalHead(title,subtitle='',eyebrow='Gentlemans Bar') {
 function selectProduct(id) {
   if(state.pending)return;
   const product=state.products.find(p=>p.id===id);if(!product)return;
-  const existing=state.cart.find(p=>p.id===id),max=999-(existing?.quantity||0);
-  if(max<1){toast('Maximal 999 Stück pro Artikel.',true);return;}
+  const existing=state.cart.find(p=>p.id===id),max=Math.min(999,product.stock_quantity)-(existing?.quantity||0);
+  if(max<1){toast('Kein weiterer Bestand verfügbar.',true);return;}
   openModal(`${modalHead(product.name,product.description,'Zur Bestellung')}<form class="modal-body" id="quantity-form"><div class="modal-product"><div class="product-icon">${icon(categoryIcon(product.category))}</div><div class="price">${money(product.price_cents)}</div></div><label for="product-quantity">Wie viele dürfen es sein?</label><div class="large-stepper"><button type="button" data-action="modal-minus" aria-label="Menge verringern">${icon('minus')}</button><input id="product-quantity" type="number" min="1" max="${max}" value="1" required autofocus><button type="button" data-action="modal-plus" aria-label="Menge erhöhen">${icon('plus')}</button></div><button class="button gold full" type="submit"><span>Hinzufügen · <span id="add-price">${money(product.price_cents)}</span></span>${icon('plus')}</button></form>`);
   $('#product-quantity').addEventListener('input',()=>{$('#add-price').textContent=money(product.price_cents*(Number($('#product-quantity').value)||0));});
   $('#quantity-form').addEventListener('submit',event=>{
@@ -177,6 +180,8 @@ function changeCart(id,change) {
   const line=state.cart.find(p=>p.id===id);if(!line)return;
   const value=typeof change==='function'?change(line.quantity):change;
   if(!Number.isInteger(value)||value<0||value>999){toast('Bitte eine ganze Menge von 1 bis 999 eingeben.',true);renderCart();return;}
+  const product=state.products.find(p=>p.id===id);
+  if(value>0&&value>(product?.stock_quantity??0)){toast(`Nur noch ${product?.stock_quantity??0} Stück verfügbar.`,true);renderCart();return;}
   if(value===0)state.cart=state.cart.filter(p=>p.id!==id);else line.quantity=value;
   state.requestId=crypto.randomUUID();saveDraft();renderCart();
 }
@@ -192,6 +197,7 @@ async function checkout() {
     state.busy=false;saveDraft();if(state.employee){renderCart();if($('#product-grid'))renderProducts();}toast(error.message,true);return;
   }
   state.busy=false;state.pending=null;state.cart=[];state.requestId=crypto.randomUUID();state.lastOrder=result.order;saveDraft();
+  try{state.products=(await api('/products')).products;refreshStockNotice();}catch{}
   renderCart();if($('#product-grid'))renderProducts();toast(`${money(result.order.total_cents,result.order.currency)} erfolgreich für ${state.employee.name} gebucht.`);
   refreshMetrics().catch(()=>toast('Verkauf gespeichert. Die Umsatzübersicht wird nach Wiederherstellung der Verbindung aktualisiert.',true));
 }
@@ -227,7 +233,7 @@ async function renderAdmin(epoch) {
   }catch(error){if(epoch===state.epoch&&$('#main'))$('#main').insertAdjacentHTML('beforeend',`<div class="empty-state"><p>${esc(error.message)}</p><br><button class="button" data-action="refresh">Erneut laden</button></div>`);}
 }
 function productForm(id) {
-  const p=id?state.allProducts.find(p=>p.id===id):{name:'',description:'',category:'Cocktails',price_cents:0,active:true};
+  const p=id?state.allProducts.find(p=>p.id===id):{name:'',description:'',category:'Essen',price_cents:0,active:true};
   if(!p)return;
   openModal(`${modalHead(id?'Artikel bearbeiten':'Ein neuer Klassiker.','','Sortiment')}<form class="modal-body" id="product-form"><div class="field"><label for="product-name">Artikelname</label><input id="product-name" name="name" value="${esc(p.name)}" maxlength="60" required></div><div class="form-row"><div class="field"><label for="product-category">Kategorie</label><input id="product-category" name="category" list="category-suggestions" value="${esc(p.category)}" maxlength="30" required><datalist id="category-suggestions">${[...new Set(['Essen','Alkoholische Getränke','Alkoholfreie Getränke','Kaffeespezialitäten','Zigaretten & Zigarren','Spezielles','Shisha','Aromen',...state.allProducts.map(p=>p.category)])].map(c=>`<option value="${esc(c)}"></option>`).join('')}</datalist></div><div class="field"><label for="product-price">Preis (${state.config.currency==='EUR'?'€':'$'})</label><input id="product-price" name="price" type="text" inputmode="decimal" value="${(p.price_cents/100).toFixed(2).replace('.',',')}" placeholder="12,00" required></div></div><div class="field"><label for="product-description">Beschreibung</label><input id="product-description" name="description" value="${esc(p.description)}" maxlength="120" placeholder="z. B. 4 cl · auf Eis"></div>${id?`<div class="field"><label for="product-active">Verfügbarkeit</label><select id="product-active" name="active"><option value="true" ${p.active?'selected':''}>Aktiv · in der Kasse anzeigen</option><option value="false" ${!p.active?'selected':''}>Pausiert · aus der Kasse ausblenden</option></select></div>`:''}<p id="product-error" class="error" role="alert"></p><div class="modal-actions"><button class="button" type="button" data-action="close-modal">Abbrechen</button><button class="button gold" type="submit">${icon('check')}Speichern</button></div></form>`);
   $('#product-form').addEventListener('submit',async event=>{
@@ -249,7 +255,7 @@ function voidForm(id) {
   $('#void-form').addEventListener('submit',async event=>{
     event.preventDefault();const form=event.currentTarget,button=$('button[type=submit]',form);button.disabled=true;
     try{
-      await api(`/orders/${encodeURIComponent(id)}/void`,{method:'POST',body:{reason:form.elements.reason.value}});modal.close();toast('Buchung storniert. Die Umsatzsummen wurden angepasst.');await renderPage();
+      await api(`/orders/${encodeURIComponent(id)}/void`,{method:'POST',body:{reason:form.elements.reason.value}});modal.close();state.products=(await api('/products')).products;toast('Buchung storniert. Umsatz und Lagerbestand wurden angepasst.');await renderPage();
     }catch(error){if($('#void-error'))$('#void-error').textContent=error.message;button.disabled=false;}
   });
 }
@@ -260,7 +266,7 @@ async function action(button) {
     case 'reload':await startApp();break;
     case 'refresh':await renderPage();break;
     case 'logout':
-      if(state.pending||state.busy){toast('Bitte zuerst den offenen Buchungsstatus prüfen.',true);return;}
+      if(state.pending||state.busy||state.operationPending){toast('Bitte zuerst den offenen Buchungsstatus prüfen.',true);return;}
       saveDraft();await api('/logout',{method:'POST',body:{}});state.employee=null;state.epoch++;renderLogin();break;
     case 'category':state.category=button.dataset.category;renderCategories();renderProducts();break;
     case 'select-product':selectProduct(id);break;
@@ -286,6 +292,12 @@ async function action(button) {
     }
     case 'order-details':await orderDetails(id);break;
     case 'void-order':voidForm(id);break;
+    case 'adjust-stock':stockForm(id);break;
+    case 'new-rental':rentalForm(button.dataset.space);break;
+    case 'cancel-rental':reasonOperation('Vermietung stornieren',`/rentals/${encodeURIComponent(id)}/cancel`,'Die Reservierung wird freigegeben und die Mieteinnahme aus der Finanzsumme entfernt.');break;
+    case 'new-finance':financeForm(button.dataset.kind);break;
+    case 'void-finance':reasonOperation('Finanzbuchung stornieren',`/finance/${encodeURIComponent(id)}/void`,'Der Eintrag bleibt nachvollziehbar und wird aus den Summen herausgerechnet.');break;
+    case 'resume-operation':resumeOperation();break;
   }
 }
 document.addEventListener('click',event=>{
@@ -303,9 +315,19 @@ setInterval(async()=>{
   if(!state.employee||document.hidden||modal.open||state.busy)return;
   try{
     await api('/me');
+    const {products}=await api('/products');
+    const newlyLow=products.filter(p=>p.stock_quantity<30&&state.products.find(old=>old.id===p.id)?.stock_quantity>=30);
+    const changed=JSON.stringify(products)!==JSON.stringify(state.products);
+    state.products=products;
+    if(newlyLow.length)toast(`Lager unter 30 Stück: ${newlyLow.map(p=>`${p.name} (${p.stock_quantity})`).join(' · ')}`,true);
     if(state.view==='kasse'){
-      const [{products}]=await Promise.all([api('/products'),refreshMetrics()]);
-      if(JSON.stringify(products)!==JSON.stringify(state.products)){state.products=products;if($('#product-grid')){renderCategories();renderProducts();}}
+      await refreshMetrics();
+      if(changed&&$('#product-grid')){renderCategories();renderProducts();refreshStockNotice();}
+    }
+    if(state.view==='inventory'&&changed){
+      const search=$('#stock-search')?.value||'',only=$('#only-low')?.checked||false;
+      await renderPage();
+      if($('#stock-search')){$('#stock-search').value=search;$('#only-low').checked=only;$('#stock-search').dispatchEvent(new Event('input'));}
     }
   }catch{}
 },30000);
