@@ -331,6 +331,8 @@ async function action(button) {
     case 'wallet-adjust':walletForm('adjustment',button.dataset.account);break;
     case 'edit-employee':employeeForm(id);break;
     case 'kick-employee':employeeAccessForm('kick',id);break;
+    case 'end-employee-sessions':employeeAccessForm('sessions',id);break;
+    case 'restore-employee':employeeAccessForm('restore',id);break;
     case 'deactivate-employee':employeeAccessForm('deactivate',id);break;
     case 'activate-employee':employeeAccessForm('activate',id);break;
     case 'void-finance':reasonOperation('Finanzbuchung stornieren',`/finance/${encodeURIComponent(id)}/void`,'Der Eintrag bleibt nachvollziehbar und wird aus den Summen herausgerechnet.');break;

@@ -31,7 +31,7 @@ test('Mitarbeiterverwaltung, Sitzungen und erhaltene Abrechnung',async t=>{
     assert.equal((await call('/orders/'+orderId)).status,200);
   }
   await t.test('Alle Mitarbeiter-Endpunkte benötigen Anmeldung; bestehende Namen erhalten sichere Vorgaben',async()=>{
-    for(const [path,body,method] of [['/employees',undefined,'GET'],['/employees/'+legacyId,{role:'Chef',department:'Bar'},'PUT'],['/employees/'+legacyId+'/kick',{},'POST'],['/employees/'+legacyId+'/status',{active:false},'PUT']])assert.equal((await call(path,body,{cookie:null,method})).status,401);
+    for(const [path,body,method] of [['/employees',undefined,'GET'],['/employees/'+legacyId,{role:'Chef',department:'Bar'},'PUT'],['/employees/'+legacyId+'/sessions/end',{},'POST'],['/employees/'+legacyId+'/status',{active:false},'PUT']])assert.equal((await call(path,body,{cookie:null,method})).status,401);
     const a=await login('Alice');alice=a.cookie;aliceId=a.data.employee.id;
     const old=(await list()).find(e=>e.id===legacyId);
     assert.equal(old.role,'Mitarbeiter');assert.equal(old.department,'');assert.equal(old.active,true);assert.equal(old.last_login_at,null);assert.equal(old.session_count,0);
@@ -60,8 +60,8 @@ test('Mitarbeiterverwaltung, Sitzungen und erhaltene Abrechnung',async t=>{
     previousTotals=(await call('/stats')).data.totals;
     assert.equal(Number((await bobEntry()).cash_cents),30000);await unchangedMoney();
   });
-  await t.test('Rauswerfen beendet alle Geräte, lässt die erneute Anmeldung zu und bewahrt Abrechnung',async()=>{
-    const kicked=await call('/employees/'+bobId+'/kick',{});assert.equal(kicked.status,200);assert.ok(kicked.data.removed_sessions>=2);
+  await t.test('Anmeldungen beenden betrifft alle Geräte, lässt die erneute Anmeldung zu und bewahrt Abrechnung',async()=>{
+    const kicked=await call('/employees/'+bobId+'/sessions/end',{});assert.equal(kicked.status,200);assert.ok(kicked.data.removed_sessions>=2);
     for(const cookie of [bob,bobSecond])assert.equal((await call('/me',undefined,{cookie})).status,401);
     assert.equal((await bobEntry()).session_count,0);await unchangedMoney();
     const again=await login('bob');assert.equal(again.status,200);assert.equal(again.data.employee.id,bobId);bob=again.cookie;
@@ -97,15 +97,15 @@ test('Mitarbeiterverwaltung, Sitzungen und erhaltene Abrechnung',async t=>{
     const row=await bobEntry();await initializeDatabase(db);
     assert.deepEqual(await bobEntry(),row);assert.equal((await call('/me')).status,200);assert.equal((await login('Bob')).status,403);await unchangedMoney();
   });
-  await t.test('Fehlerhafte Ziele/Status und eigene Deaktivierung werden abgewiesen; eigener Rauswurf möglich',async()=>{
-    assert.equal((await call('/employees/not-an-id/kick',{})).status,400);
-    assert.equal((await call('/employees/'+randomUUID()+'/kick',{})).status,404);
+  await t.test('Fehlerhafte Ziele/Status und eigene Deaktivierung werden abgewiesen; eigene Abmeldung möglich',async()=>{
+    assert.equal((await call('/employees/not-an-id/sessions/end',{})).status,400);
+    assert.equal((await call('/employees/'+randomUUID()+'/sessions/end',{})).status,404);
     assert.equal((await call('/employees/'+randomUUID(),{role:'Chef',department:'Bar'},{method:'PUT'})).status,404);
     assert.equal((await call('/employees/'+randomUUID()+'/status',{active:true},{method:'PUT'})).status,404);
     assert.equal((await call('/employees/'+aliceId+'/status',{active:'false'},{method:'PUT'})).status,400);
     assert.equal((await call('/employees/'+aliceId+'/status',{active:false},{method:'PUT'})).status,409);
     assert.equal((await call('/me')).status,200);
-    assert.equal((await call('/employees/'+aliceId+'/kick',{})).status,200);
+    assert.equal((await call('/employees/'+aliceId+'/sessions/end',{})).status,200);
     assert.equal((await call('/me')).status,401);
   });
 });
