@@ -155,6 +155,14 @@ Im Buchungsfenster Name, optional Familie, Nummer, Beginn und Tarif angeben. Bei
 
 Die VIP-Seite zeigt Name, Familie, Nummer, Beginn, Ende, Preis, Mitarbeiter und Status. Suchbar und filterbar nach aktiv/geplant, beendet, storniert oder allen Vermietungen. **Mehrere Gäste können denselben Bereich im gleichen Zeitraum buchen**, sowohl die VIP Lounge als auch den Oberen Bereich. Auch beide Bereiche können gleichzeitig vermietet werden. Es gibt keine Sperre für überlappende Zeiträume. Jeden Gast separat über die jeweilige Schaltfläche buchen; jede Buchung erhält ihre eigene Mieteinnahme zum gewählten Tarif. **Beim Buchen wird die gesamte Miete als Einnahme am Buchungstag in Finanzen erfasst**; bei Bedarf erst nach dem Zahlungseingang buchen. Ein Storno mit Grund storniert nur die ausgewählte Vermietung und ihre verknüpfte Einnahme; die Buchungen anderer Gäste bleiben bestehen.
 
+In beiden Buchungsfenstern gibt es zwei unabhängige Ankreuzfelder:
+
+- **Kostenlos:** Miete 0 $. Der normale Zeitraum gilt weiterhin, solange „Unbegrenzt“ nicht gewählt wird. Es werden keine Mieteinnahme und keine Geldbewegung erzeugt.
+- **Unbegrenzt:** kein Enddatum. Die Buchung bleibt ab ihrem Beginn aktiv, bis sie storniert wird; vor ihrem Beginn erscheint sie als geplant. Ohne „Kostenlos“ wird der ausgewählte Tarif einmalig berechnet: 50.000 $ für die VIP Lounge oder 100.000 $ / 250.000 $ für den Oberen Bereich. Es entstehen keine automatischen Folgebuchungen. Bei der VIP Lounge entfällt das Dauerfeld.
+- **Beide angekreuzt:** kostenlos und ohne Enddatum.
+
+Die Vorschau zeigt Enddatum bzw. „Unbegrenzt“ und den tatsächlichen Preis. Die VIP-Gästekarte zeigt die gewählten Optionen auch nach dem Neuladen. Unbegrenzte Buchungen erscheinen unter „Aktiv & geplant“, nicht unter „Beendet“; nach Storno stehen sie unter „Storniert“. Ein Storno funktioniert auch bei kostenlosen Buchungen, ohne einen Geldbetrag abzuziehen. Bestehende Mietzeiträume, Preise und Einnahmen bleiben bei Einführung der Optionen erhalten.
+
 ## Kassenstand, Bargeld und Bankeinzahlungen
 
 Die neue Seite **Kassenstand** zeigt **Gesamtbestand = Bank + Übergangskonto + Bargeld beim Team**. Diese Geldbestände starten bei Einführung dieser Erweiterung einmalig bei **0 $**. Bestehende Umsätze, Vermietungen und Finanzbuchungen werden erhalten und nicht nachträglich in die neuen Bestände importiert. Unter **Bestand festlegen** die tatsächlichen Anfangsbestände für Bank, Übergangskonto und jeden Mitarbeiter eintragen; angegeben wird der neue Gesamtbetrag, nicht eine zusätzliche Einzahlung. Solche Korrekturen benötigen einen Grund und erzeugen keinen neuen Umsatz. Weitere Deployments oder Neustarts setzen die Bestände nicht zurück.

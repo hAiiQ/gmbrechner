@@ -23,7 +23,7 @@ async function completeOperation(pending) {
     throw error;
   }
 }
-function operationForm(form,url,makeBody) {
+function operationForm(form,url,makeBody,onRestore) {
   const id=crypto.randomUUID();
   form.addEventListener('submit',async event=>{
     event.preventDefault();const button=$('button[type=submit]',form),errorEl=$('.error',form);errorEl.textContent='';button.disabled=true;
@@ -32,7 +32,7 @@ function operationForm(form,url,makeBody) {
       for(const field of form.querySelectorAll('input,select,textarea'))field.disabled=true;
       await completeOperation(pending);
     }catch(error){
-      if(form.isConnected){errorEl.textContent=error.message;button.disabled=false;button.textContent=state.operationPending?'Buchung prüfen':'Speichern';for(const field of form.querySelectorAll('input,select,textarea'))field.disabled=!!state.operationPending;}
+      if(form.isConnected){errorEl.textContent=error.message;button.disabled=false;button.textContent=state.operationPending?'Buchung prüfen':'Speichern';for(const field of form.querySelectorAll('input,select,textarea'))field.disabled=!!state.operationPending;if(onRestore)onRestore();}
       else toast(error.message,true);
     }
   });
@@ -66,16 +66,17 @@ function stockForm(id) {
   openModal(`${modalHead(p.name,`Aktueller Bestand: ${p.stock_quantity} Stück`,'Lagerbestand')}<form class="modal-body" id="stock-form"><div class="field"><label for="stock-quantity">Neuer Gesamtbestand (Stück)</label><input id="stock-quantity" name="quantity" type="number" min="0" max="1000000" step="1" value="${p.stock_quantity}" required></div><div class="field"><label for="stock-reason">Grund für die Änderung</label><textarea id="stock-reason" name="reason" rows="2" minlength="3" maxlength="200" placeholder="z. B. Nachlieferung +50 oder Inventur" required></textarea></div><p class="helper">Gib den gesamten Bestand nach der Änderung an. Verkäufe und Stornos werden automatisch berücksichtigt.</p><p class="error" role="alert"></p><div class="modal-actions"><button class="button" type="button" data-action="close-modal">Abbrechen</button><button class="button gold" type="submit">Speichern</button></div></form>`);
   operationForm($('#stock-form'),`/inventory/${encodeURIComponent(id)}`,form=>({quantity:Number(form.elements.quantity.value),expected_quantity:p.stock_quantity,reason:form.elements.reason.value}));
 }
-function rentalStatus(r){return r.cancelled_at?['Storniert','void']:+new Date(r.ends_at)<=Date.now()?['Beendet','inactive']:+new Date(r.starts_at)>Date.now()?['Geplant','planned']:['Aktiv',''];}
+function rentalHasEnded(r){return !!r.ends_at&&+new Date(r.ends_at)<=Date.now();}
+function rentalStatus(r){return r.cancelled_at?['Storniert','void']:rentalHasEnded(r)?['Beendet','inactive']:+new Date(r.starts_at)>Date.now()?['Geplant','planned']:['Aktiv',''];}
 async function renderVIP(epoch) {
   $('#main').innerHTML=`${pageHeading('Für besondere Abende.','Mehrere Gäste können denselben Bereich gleichzeitig buchen.','VIP & Vermietung')}<div class="rental-offers"><article class="rental-offer"><span class="eyebrow">STUNDENWEISE</span><h2>VIP Lounge</h2><p>Privater Raum für besondere Gesellschaft.</p><div class="rental-price">50.000 $<span>pro Stunde</span></div><button class="button gold" data-action="new-rental" data-space="vip">${icon('plus')}VIP Lounge vermieten</button></article><article class="rental-offer upper-offer"><span class="eyebrow">FESTE LAUFZEITEN</span><h2>Oberer Bereich</h2><p>Mehr Raum. Mehr Zeit. Ein eigener Bereich.</p><div class="upper-rates"><div class="rental-price">100.000 $<span>für 1 Woche</span></div><div class="rental-price">250.000 $<span>für 4 Wochen</span></div></div><button class="button gold" data-action="new-rental" data-space="upper">${icon('plus')}Oberen Bereich vermieten</button></article></div><section class="panel"><div class="panel-heading"><h2>Unsere VIP-Gäste</h2><button class="detail-button" data-action="refresh">${icon('clock')}Aktualisieren</button></div><div class="vip-filter"><label for="vip-status">Zeitraum / Status</label><select id="vip-status"><option value="current">Aktiv & geplant</option><option value="all">Alle Vermietungen</option><option value="ended">Beendet</option><option value="cancelled">Storniert</option></select><div class="search">${icon('search')}<input id="vip-search" type="search" aria-label="VIP-Gäste suchen" placeholder="Name, Familie oder Nummer …"></div></div><div id="vip-list" class="table-empty">Vermietungen werden geladen …</div></section>`;
   try {
     const data=await api('/rentals');if(epoch!==state.epoch)return;state.rentals=data.rentals;
     function draw(){
       const search=$('#vip-search').value.toLocaleLowerCase('de-DE'),filter=$('#vip-status').value;
-      const rentals=data.rentals.filter(r=>`${r.customer_name} ${r.family} ${r.phone}`.toLocaleLowerCase('de-DE').includes(search)&&(filter==='all'||filter==='cancelled'&&r.cancelled_at||filter==='ended'&&!r.cancelled_at&&+new Date(r.ends_at)<=Date.now()||filter==='current'&&!r.cancelled_at&&+new Date(r.ends_at)>Date.now()));
+      const rentals=data.rentals.filter(r=>`${r.customer_name} ${r.family} ${r.phone}`.toLocaleLowerCase('de-DE').includes(search)&&(filter==='all'||filter==='cancelled'&&r.cancelled_at||filter==='ended'&&!r.cancelled_at&&rentalHasEnded(r)||filter==='current'&&!r.cancelled_at&&!rentalHasEnded(r)));
       const el=$('#vip-list');el.className='';
-      el.innerHTML=rentals.length?`<div class="vip-grid">${rentals.map(r=>{const [status,cls]=rentalStatus(r);return `<article class="vip-card"><div class="vip-card-top"><span class="eyebrow">${spaceName(r.space)}</span><span class="badge ${cls}">${status}</span></div><h3>${esc(r.customer_name)}</h3><p class="vip-family">${r.family?`Familie: ${esc(r.family)}`:'Ohne Familienangabe'}</p><dl><div><dt>Nummer</dt><dd>${esc(r.phone)}</dd></div><div><dt>Beginn</dt><dd>${date(r.starts_at)} · ${time(r.starts_at)}</dd></div><div><dt>Ende</dt><dd>${date(r.ends_at)} · ${time(r.ends_at)}</dd></div><div><dt>Miete</dt><dd>${money(r.total_cents,r.currency)}<small>${r.quantity} ${unitName(r.unit,r.quantity)}</small></dd></div></dl><p class="helper">Gebucht von ${esc(r.employee_name)} · ${date(r.created_at)}</p>${r.cancelled_at?`<p class="void-note">Grund: ${esc(r.cancel_reason)}</p>`:`<button class="detail-button cancel-link" data-action="cancel-rental" data-id="${esc(r.id)}">Vermietung stornieren</button>`}</article>`;}).join('')}</div>`:'<div class="table-empty">Keine Vermietungen für diesen Filter.<br>Neue Gäste erscheinen nach der Buchung hier.</div>';
+      el.innerHTML=rentals.length?`<div class="vip-grid">${rentals.map(r=>{const [status,cls]=rentalStatus(r);return `<article class="vip-card"><div class="vip-card-top"><span class="eyebrow">${spaceName(r.space)}</span><span class="badge ${cls}">${status}</span></div><h3>${esc(r.customer_name)}</h3>${r.is_free||r.is_unlimited?`<div class="vip-options">${r.is_free?'<span class="badge rental-option-tag">Kostenlos</span>':''}${r.is_unlimited?'<span class="badge rental-option-tag">Unbegrenzt</span>':''}</div>`:''}<p class="vip-family">${r.family?`Familie: ${esc(r.family)}`:'Ohne Familienangabe'}</p><dl><div><dt>Nummer</dt><dd>${esc(r.phone)}</dd></div><div><dt>Beginn</dt><dd>${date(r.starts_at)} · ${time(r.starts_at)}</dd></div><div><dt>Ende</dt><dd>${r.is_unlimited||!r.ends_at?'Unbegrenzt':date(r.ends_at)+' · '+time(r.ends_at)}</dd></div><div><dt>Miete</dt><dd>${money(r.total_cents,r.currency)}<small>${r.is_free?'Kostenlos':r.is_unlimited?'Einmaliger Tarif':r.quantity+' '+unitName(r.unit,r.quantity)}</small></dd></div></dl><p class="helper">Gebucht von ${esc(r.employee_name)} · ${date(r.created_at)}</p>${r.cancelled_at?`<p class="void-note">Grund: ${esc(r.cancel_reason)}</p>`:`<button class="detail-button cancel-link" data-action="cancel-rental" data-id="${esc(r.id)}">Vermietung stornieren</button>`}</article>`;}).join('')}</div>`:'<div class="table-empty">Keine Vermietungen für diesen Filter.<br>Neue Gäste erscheinen nach der Buchung hier.</div>';
     }
     $('#vip-status').addEventListener('change',draw);$('#vip-search').addEventListener('input',draw);draw();
   }catch(error){if(epoch===state.epoch&&$('#vip-list'))$('#vip-list').innerHTML=`<p class="error">${esc(error.message)}</p><button class="button" data-action="refresh">Erneut laden</button>`;}
@@ -86,12 +87,41 @@ function berlinNowInput(){
 }
 function rentalForm(space) {
   if(state.operationPending)return resumeOperation();
-  openModal(`${modalHead(spaceName(space)+' vermieten','Der Mietbetrag wird beim Buchen als Einnahme in Finanzen erfasst.','VIP & Vermietung')}<form class="modal-body" id="rental-form"><div class="field"><label for="rental-name">Name</label><input id="rental-name" name="customer_name" minlength="2" maxlength="80" required></div><div class="form-row"><div class="field"><label for="rental-family">Familie (optional)</label><input id="rental-family" name="family" maxlength="80"></div><div class="field"><label for="rental-phone">Nummer</label><input id="rental-phone" name="phone" type="tel" maxlength="40" required></div></div><div class="field"><label for="rental-start">Beginn (Europe/Berlin)</label><input id="rental-start" name="start" type="datetime-local" min="2020-01-01T00:00" max="2090-12-31T23:59" value="${berlinNowInput()}" required></div><div class="${space==='vip'?'form-row':'rental-tariff'}"><div class="field"><label for="rental-unit">Tarif</label><select id="rental-unit" name="unit">${space==='vip'?'<option value="hour">50.000 $ / Stunde</option>':'<option value="week">1 Woche · 100.000 $</option><option value="four_weeks">4 Wochen · 250.000 $</option>'}</select></div>${space==='vip'?'<div class="field"><label for="rental-duration">Dauer (Stunden)</label><input id="rental-duration" name="quantity" type="number" min="1" max="52" step="1" value="1" required></div>':''}</div><div class="rental-quote" id="rental-quote" aria-live="polite">Zeitraum wird berechnet …</div><div class="field"><label for="rental-payment">Zahlung</label><select id="rental-payment" name="payment">${walletPaymentOptions('cash')}</select></div><p class="helper">${space==='vip'?'Das Enddatum ergibt sich aus Beginn und Dauer.':'Der Zeitraum beträgt automatisch 1 oder 4 Wochen ab Beginn.'} Alle Zeiten: Europe/Berlin.</p><p class="error" role="alert"></p><div class="modal-actions"><button class="button" type="button" data-action="close-modal">Abbrechen</button><button class="button gold" type="submit">Vermietung buchen</button></div></form>`);
+  openModal(`${modalHead(spaceName(space)+' vermieten','Name, Zeitraum und Buchungsoptionen festlegen.','VIP & Vermietung')}<form class="modal-body" id="rental-form">
+    <div class="field"><label for="rental-name">Name</label><input id="rental-name" name="customer_name" minlength="2" maxlength="80" required></div>
+    <div class="form-row"><div class="field"><label for="rental-family">Familie (optional)</label><input id="rental-family" name="family" maxlength="80"></div><div class="field"><label for="rental-phone">Nummer</label><input id="rental-phone" name="phone" type="tel" maxlength="40" required></div></div>
+    <div class="field"><label for="rental-start">Beginn (Europe/Berlin)</label><input id="rental-start" name="start" type="datetime-local" min="2020-01-01T00:00" max="2090-12-31T23:59" value="${berlinNowInput()}" required></div>
+    <fieldset class="rental-options"><legend>Buchungsoptionen</legend><label class="rental-option"><input id="rental-free" name="free" type="checkbox"><span><strong>Kostenlos</strong><small>Keine Miete · 0 $</small></span></label><label class="rental-option"><input id="rental-unlimited" name="unlimited" type="checkbox"><span><strong>Unbegrenzt</strong><small>Ohne Enddatum</small></span></label></fieldset>
+    <div id="rental-tariff-fields" class="${space==='vip'?'form-row':'rental-tariff'}"><div class="field"><label id="rental-unit-label" for="rental-unit">Tarif</label><select id="rental-unit" name="unit">${space==='vip'?'<option value="hour">50.000 $ / Stunde</option>':'<option value="week">1 Woche · 100.000 $</option><option value="four_weeks">4 Wochen · 250.000 $</option>'}</select></div>${space==='vip'?'<div class="field" id="rental-duration-field"><label for="rental-duration">Dauer (Stunden)</label><input id="rental-duration" name="quantity" type="number" min="1" max="52" step="1" value="1" required></div>':''}</div>
+    <div class="rental-quote" id="rental-quote" aria-live="polite">Zeitraum wird berechnet …</div><div class="field" id="rental-payment-field"><label for="rental-payment">Zahlung</label><select id="rental-payment" name="payment">${walletPaymentOptions('cash')}</select></div><p class="helper" id="rental-help"></p><p class="error" role="alert"></p><div class="modal-actions"><button class="button" type="button" data-action="close-modal">Abbrechen</button><button class="button gold" type="submit">Vermietung buchen</button></div></form>`);
   const form=$('#rental-form');let revision=0;
-  const body=()=>({space,start:form.elements.start.value,unit:form.elements.unit.value,...(space==='vip'?{quantity:Number(form.elements.quantity.value)}:{})});
-  async function refresh(){const current=++revision;try{const {quote:q}=await api('/rentals/quote',{method:'POST',body:body()});if(current!==revision||!form.isConnected)return;$('#rental-quote').innerHTML=`<span>Bis ${date(q.ends_at)} · ${time(q.ends_at)} Uhr</span><strong>${money(q.total_cents,'USD')}</strong>`;}catch(error){if(current===revision&&$('#rental-quote'))$('#rental-quote').textContent=error.message;}}
-  for(const name of (space==='vip'?['start','unit','quantity']:['start','unit']))form.elements[name].addEventListener('input',refresh);refresh();
-  operationForm(form,'/rentals',()=>({...body(),customer_name:form.elements.customer_name.value,family:form.elements.family.value,phone:form.elements.phone.value,payment:form.elements.payment.value}));
+  const body=()=>({space,start:form.elements.start.value,unit:form.elements.unit.value,free:form.elements.free.checked,unlimited:form.elements.unlimited.checked,...(space==='vip'?{quantity:form.elements.unlimited.checked?1:Number(form.elements.quantity.value)}:{})});
+  function syncOptions(){
+    const free=form.elements.free.checked,unlimited=form.elements.unlimited.checked,locked=!!state.operationPending;
+    $('#rental-tariff-fields').classList.toggle('hidden',free&&unlimited);
+    form.elements.unit.disabled=locked||(free&&unlimited);
+    $('#rental-unit-label').textContent=unlimited?'Einmaliger Tarif':free?'Zeitraum':'Tarif';
+    if(space==='vip'){
+      $('#rental-duration-field').classList.toggle('hidden',unlimited);form.elements.quantity.disabled=locked||unlimited;
+      form.elements.unit.options[0].textContent=free?'Stundenweise · kostenlos':unlimited?'Einmalig · 50.000 $':'50.000 $ / Stunde';
+    }else{
+      form.elements.unit.options[0].textContent=free?'1 Woche':unlimited?'Einmalig · 100.000 $':'1 Woche · 100.000 $';
+      form.elements.unit.options[1].textContent=free?'4 Wochen':unlimited?'Einmalig · 250.000 $':'4 Wochen · 250.000 $';
+    }
+    $('#rental-payment-field').classList.toggle('hidden',free);form.elements.payment.disabled=locked||free;
+    $('#rental-help').textContent=(unlimited?'Ohne Enddatum. ':space==='vip'?'Das Enddatum ergibt sich aus Beginn und Dauer. ':'Der Zeitraum beträgt automatisch 1 oder 4 Wochen ab Beginn. ')+(free?'Keine Zahlung und keine Mieteinnahme.':unlimited?'Der gewählte Tarif wird einmalig als Mieteinnahme gebucht.':'Der Mietbetrag wird beim Buchen als Einnahme erfasst.')+' Alle Zeiten: Europe/Berlin.';
+  }
+  async function refresh(){
+    syncOptions();const current=++revision;
+    try{
+      const {quote:q}=await api('/rentals/quote',{method:'POST',body:body()});if(current!==revision||!form.isConnected)return;
+      $('#rental-quote').innerHTML=`<span>${q.is_unlimited?'Unbegrenzt · ohne Enddatum':'Bis '+date(q.ends_at)+' · '+time(q.ends_at)+' Uhr'}</span><strong>${money(q.total_cents,'USD')}</strong><span>${q.is_free?'Kostenlos':q.is_unlimited?'Einmalige Miete':'Gesamte Miete'}</span>`;
+    }catch(error){if(current===revision&&form.isConnected)$('#rental-quote').textContent=error.message;}
+  }
+  for(const name of (space==='vip'?['start','unit','quantity']:['start','unit']))form.elements[name].addEventListener('input',refresh);
+  for(const name of ['free','unlimited'])form.elements[name].addEventListener('change',refresh);
+  refresh();
+  operationForm(form,'/rentals',()=>({...body(),customer_name:form.elements.customer_name.value,family:form.elements.family.value,phone:form.elements.phone.value,payment:form.elements.payment.value}),syncOptions);
 }
 function reasonOperation(title,url,subtitle) {
   if(state.operationPending)return resumeOperation();
