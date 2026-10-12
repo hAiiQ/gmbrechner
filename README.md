@@ -5,6 +5,7 @@ Eine responsive Kasse in Schwarz, Oliv und Gold, gestaltet mit eurem Emblem und 
 ## Was enthalten ist
 
 - Anmeldung mit Mitarbeitername und gemeinsamem Bar-Passwort; optional 30 Tage angemeldet bleiben. Derselbe Name wird unabhängig von Groß-/Kleinschreibung wiedererkannt.
+- Mitarbeiterliste mit frei wählbarer Rolle und Abteilung, Abmelden auf allen Geräten, Deaktivieren und Wiederaktivieren.
 - Artikelliste mit Kategorien und Suche, Mengenauswahl, Warenkorb und exakter Berechnung in Cent.
 - Verkauf buchen mit Kennzeichnung „Bar“ oder „Karte“. Die Seite erfasst die Zahlung; sie belastet keine Karte und verbindet kein Kartenterminal.
 - Umsatz pro Mitarbeiter, Gesamtumsatz, Tages-/Wochen-/Monatsübersicht und eigene Datumsfilter.
@@ -30,6 +31,16 @@ Neue Verkäufe werden nach dem Kartenimport in USD gebucht. Bestehende Buchungen
 Mit eurem Namen und dem vereinbarten gemeinsamen Passwort anmelden. **Angemeldet bleiben** ist standardmäßig aktiviert und hält die Anmeldung auf diesem Gerät **30 Tage** gültig. Der zuletzt verwendete Name wird dabei vorausgefüllt. Das Passwort wird dabei nicht im Browser-Speicher gespeichert. Über Abmelden endet die Sitzung sofort. Ohne die Option wird ein Browser-Sitzungscookie mit maximal zwölf Stunden Gültigkeit verwendet.
 
 Beim ersten Deploy der Passwort-Erweiterung werden die bisherigen Sitzungen ohne Passwortnachweis ungültig: einmal erneut anmelden. Alle Mitarbeiter, Umsätze und Bestände bleiben erhalten. Weitere Deployments mit demselben Passwort erhalten die angemeldeten Sitzungen. Optional kann **BAR_PASSWORD** in Render Environment oder einer lokalen .env überschrieben werden; ein Wechsel macht vorhandene Sitzungen ungültig. Der Vorgabewert ist als gesalzener Verifikator im Server hinterlegt, daher ist kein zusätzlicher Render-Wert notwendig.
+
+## Mitarbeiterliste
+
+Unter **Mitarbeiter** erscheinen alle Namen, die sich bisher angemeldet haben, einschließlich abgemeldeter und deaktivierter Personen. Die Übersicht zeigt Rolle, Abteilung, letzte Anmeldung, Anzahl gültiger Anmeldungen und noch vorhandenes Bargeld. Nach Name, Rolle oder Abteilung suchen oder nach aktiv, angemeldet und deaktiviert filtern. Eine gültige Anmeldung ist kein Nachweis, dass die Person gerade die Seite geöffnet hat.
+
+Über **Rolle & Abteilung** eine vorgeschlagene Rolle auswählen oder eine eigene Funktion eintragen. Die **Abteilung** ist ein freies Textfeld, etwa „Bar“, „Küche“ oder „VIP-Service“, und darf leer bleiben. Rolle und Abteilung dienen der Zuordnung im Team. Alle angemeldeten Mitarbeiter können diese Angaben und die Mitarbeiterliste verwalten; daraus entstehen keine zusätzlichen Berechtigungsstufen.
+
+**Rauswerfen** beendet alle Anmeldungen der Person auf allen Geräten. Mit dem bisherigen Namen und dem Bar-Passwort kann sie sich danach erneut anmelden. **Deaktivieren** beendet zusätzlich die Anmeldungen und sperrt die erneute Anmeldung mit diesem Namen, auch mit anderer Groß-/Kleinschreibung. Weil die Anmeldung weiterhin einen frei gewählten Namen und das gemeinsame Passwort verwendet, ist diese Sperre an den Namen gebunden. Über **Wieder aktivieren** kann die Person mit ihrer bisherigen Mitarbeiter-ID zurückkehren. Niemand kann sich selbst deaktivieren; ein anderer angemeldeter Mitarbeiter kann dies übernehmen.
+
+Es werden keine Mitarbeiterdaten gelöscht: bisherige Umsätze, Buchungen, Bargeldbestände und Zuordnungen bleiben bei Rauswurf oder Deaktivierung erhalten. Offenes Bargeld bleibt auch unter **Kassenstand** sichtbar und kann weiterhin auf die Bank eingezahlt werden. Bestehende Mitarbeiter erhalten beim Update die Rolle „Mitarbeiter“, eine leere Abteilung und behalten ihre gültigen Anmeldungen. Spätere Deployments bewahren die eingetragenen Angaben und Sperren.
 
 ## FiveM-Tablet und eingebettete Browser
 
@@ -160,6 +171,6 @@ npm run check
 npm test
 ```
 
-Die Integrationstests prüfen Berechnung und Mitarbeiterzuordnung, doppelte und gleichzeitige Requests, Preisänderungen, ungültige Mengen, Stornos, Berliner Tagesgrenzen, CSV und dauerhafte lokale Speicherung. Zusätzlich prüfen sie die 24 Foto-Bestände, konkurrierende Verkäufe, Stock-Stornos, einmalige Datenmigration, feste Miettarife, Wochenlaufzeiten, Sommerzeit, Reservierungskonflikte sowie Finanzsummen und -stornos sowie Passwortschutz, dauerhafte/abgelaufene Sitzungen, die 24 Einkaufspreise, Einkaufsabrechnung, Bestandszuwachs, Wiederholungen und Einkaufsstornos. Sie verwenden eigene isolierte Testdatenbanken.
+Die Integrationstests prüfen Berechnung und Mitarbeiterzuordnung, doppelte und gleichzeitige Requests, Preisänderungen, ungültige Mengen, Stornos, Berliner Tagesgrenzen, CSV und dauerhafte lokale Speicherung. Zusätzlich prüfen sie die 24 Foto-Bestände, konkurrierende Verkäufe, Stock-Stornos, einmalige Datenmigration, feste Miettarife, Wochenlaufzeiten, Sommerzeit, gleichzeitige Gäste sowie Finanzsummen und -stornos sowie Passwortschutz, dauerhafte/abgelaufene Sitzungen, die 24 Einkaufspreise, Einkaufsabrechnung, Bestandszuwachs, Wiederholungen und Einkaufsstornos. Die Mitarbeiter-Tests prüfen freie Rollen und Abteilungen, Rauswurf auf mehreren Geräten, Namenssperren und Wiederaktivierung, konkurrierende Anmeldung/Deaktivierung sowie den Erhalt von Umsätzen, Bargeld, Mitarbeiter-IDs und Angaben beim Update. Sie verwenden eigene isolierte Testdatenbanken.
 
 Dateien: `server.js` startet die App; `lib/app.js` enthält die API; `lib/database.js` verwaltet Datenbank und Tabellen; `public/` enthält die Oberfläche; `render.yaml` bereitet das Hosting vor.
