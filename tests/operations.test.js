@@ -89,8 +89,8 @@ test('Lager, Vermietungen und Finanzen mit echter Datenbank',async t=>{
     const money=(await call('/finance')).data.totals;
     assert.equal(Number(money.rental_income_cents),10000000);
   });
-  await t.test('Doppelte Reservierung blockiert, angrenzende Zeiträume möglich, beide Räume getrennt',async()=>{
-    assert.equal((await call('/rentals',{...vip,id:randomUUID(),start:'2026-11-01T19:00'})).status,409);
+  await t.test('Mehrere Gäste im selben Bereich und Zeitraum sowie beide Bereiche gleichzeitig möglich',async()=>{
+    assert.equal((await call('/rentals',{...vip,id:randomUUID(),customer_name:'Weiterer Gast',start:'2026-11-01T19:00'})).status,201);
     assert.equal((await call('/rentals',{...vip,id:randomUUID(),start:'2026-11-01T20:00',quantity:1})).status,201);
     const body={...vip,id:randomUUID(),space:'upper',unit:'week',quantity:1,family:''};upperId=body.id;
     const result=await call('/rentals',body);assert.equal(result.status,201);assert.equal(result.data.rental.total_cents,10000000);assert.equal(result.data.rental.family,'');
@@ -127,7 +127,7 @@ test('Lager, Vermietungen und Finanzen mit echter Datenbank',async t=>{
     const money=await db.query('SELECT amount_cents FROM finance_entries WHERE rental_id=$1',[id]);
     assert.equal(money.rows.length,1);assert.equal(money.rows[0].amount_cents,25000000);
   });
-  await t.test('Vermietungsstorno gibt den Zeitraum frei und storniert die Einnahme einmal',async()=>{
+  await t.test('Vermietungsstorno betrifft nur diese Buchung und storniert ihre Einnahme einmal',async()=>{
     const f=(await db.query('SELECT id FROM finance_entries WHERE rental_id=$1',[vipId])).rows[0].id;
     assert.equal((await call('/finance/'+f+'/void',{reason:'Nicht hier'})).status,409);
     assert.equal((await call('/rentals/'+vipId+'/cancel',{reason:'Gast abgesagt'})).status,200);

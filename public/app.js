@@ -300,7 +300,7 @@ async function action(button) {
     case 'void-order':voidForm(id);break;
     case 'adjust-stock':stockForm(id);break;
     case 'new-rental':rentalForm(button.dataset.space);break;
-    case 'cancel-rental':reasonOperation('Vermietung stornieren',`/rentals/${encodeURIComponent(id)}/cancel`,'Die Reservierung wird freigegeben und die Mieteinnahme aus der Finanzsumme entfernt.');break;
+    case 'cancel-rental':reasonOperation('Vermietung stornieren',`/rentals/${encodeURIComponent(id)}/cancel`,'Nur diese Vermietung und ihre Mieteinnahme werden storniert. Andere Gäste bleiben gebucht.');break;
     case 'new-finance':financeForm(button.dataset.kind);break;
     case 'void-finance':reasonOperation('Finanzbuchung stornieren',`/finance/${encodeURIComponent(id)}/void`,'Der Eintrag bleibt nachvollziehbar und wird aus den Summen herausgerechnet.');break;
     case 'resume-operation':resumeOperation();break;
