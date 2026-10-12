@@ -6,7 +6,7 @@ import {createApp} from '../lib/app.js';
 
 test('Lager, Vermietungen und Finanzen mit echter Datenbank',async t=>{
   const db=await openDatabase({memory:true});await initializeDatabase(db);
-  const server=createApp(db,{loginLimit:1000}).listen(0,'127.0.0.1');
+  const server=createApp(db,{loginLimit:1000,accessPassword:'test-bar-access'}).listen(0,'127.0.0.1');
   await new Promise(resolve=>server.once('listening',resolve));
   t.after(async()=>{await new Promise(resolve=>server.close(resolve));await db.close();});
   const base=`http://127.0.0.1:${server.address().port}/api`;
@@ -19,7 +19,7 @@ test('Lager, Vermietungen und Finanzen mit echter Datenbank',async t=>{
   const sale=(id,quantity,price,requestId=randomUUID())=>({id:requestId,payment:'cash',currency:'USD',items:[{productId:id,quantity,unitPriceCents:price}]});
   await t.test('Nur angemeldete Mitarbeiter haben Zugriff',async()=>{
     for(const path of ['/inventory','/rentals','/finance'])assert.equal((await call(path)).status,401);
-    cookie=(await call('/login',{name:'Lager Team'})).cookie;
+    cookie=(await call('/login',{name:'Lager Team',password:'test-bar-access'})).cookie;
   });
   await t.test('Alle 24 Bildbestände: nur Stückzahlen, Stapel addiert, Warnung streng unter 30',async()=>{
     const inv=(await call('/inventory')).data;

@@ -13,7 +13,7 @@ try {
 const {production,port}=config;
 const db=await openDatabase({url:config.databaseUrl,directory:config.dataDirectory});
 await initializeDatabase(db);
-const app=createApp(db,{production});
+const app=createApp(db,{production,accessPassword:config.accessPassword});
 const server=app.listen(port,'0.0.0.0',()=>console.log(`Gentlemans Bar läuft auf http://localhost:${port}`));
 let shuttingDown=false;
 async function shutdown() {

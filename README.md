@@ -4,13 +4,14 @@ Eine responsive Kasse in Schwarz, Oliv und Gold, gestaltet mit eurem Emblem und 
 
 ## Was enthalten ist
 
-- Anmeldung mit Mitarbeitername. Derselbe Name wird unabhängig von Groß-/Kleinschreibung wiedererkannt.
+- Anmeldung mit Mitarbeitername und gemeinsamem Bar-Passwort; optional 30 Tage angemeldet bleiben. Derselbe Name wird unabhängig von Groß-/Kleinschreibung wiedererkannt.
 - Artikelliste mit Kategorien und Suche, Mengenauswahl, Warenkorb und exakter Berechnung in Cent.
 - Verkauf buchen mit Kennzeichnung „Bar“ oder „Karte“. Die Seite erfasst die Zahlung; sie belastet keine Karte und verbindet kein Kartenterminal.
 - Umsatz pro Mitarbeiter, Gesamtumsatz, Tages-/Wochen-/Monatsübersicht und eigene Datumsfilter.
 - Buchungsdetails, meistverkaufte Artikel und CSV-Export aller Positionen im gewählten Zeitraum.
 - Artikelverwaltung für alle angemeldeten Mitarbeiter: Preise ändern, Artikel hinzufügen und pausieren.
 - Storno mit Begründung. Die ursprüngliche Buchung bleibt sichtbar und zählt nicht mehr zum Umsatz.
+- Eigene Einkaufsseite: Einkaufsmengen erfassen, Einkaufspreise berechnen, Bestand erhöhen und Kosten automatisch als Ausgabe buchen.
 - Lagerbestand mit Warnungen unter 30 Stück, automatischem Abzug bei Verkäufen, Rückgabe bei Storno und Bestandsänderungen mit Grund.
 - Separate VIP-Seite für VIP Lounge und Oberen Bereich mit Kundendaten, Mietzeitraum und automatischer Mieteinnahme.
 - Finanzen mit sonstigen Einnahmen, Ausgaben, Pflichtgrund, Stornos und Gesamtsaldo.
@@ -22,6 +23,12 @@ Die Kasse enthält **24 Artikel aus eurer Speise- und Shishakarte** mit den best
 Beim ersten Start mit dieser Version wird die Karte auch in bestehenden Datenbanken automatisch eingespielt. Alte Beispielartikel werden aus Kasse und Sortiment archiviert; selbst angelegte zusätzliche Artikel bleiben erhalten. Die Umstellung auf die echte Karte erfolgt einmalig. Weitere Starts oder Deployments überschreiben eure späteren Preisänderungen nicht.
 
 Neue Verkäufe werden nach dem Kartenimport in USD gebucht. Bestehende Buchungen behalten ihre ursprünglichen Artikel, Preise und Währungen. Falls noch Euro-Umsätze aus der vorherigen Version vorhanden sind, könnt ihr in „Umsätze“ zwischen Dollar und Euro wählen. Die Summen werden je Währung getrennt berechnet; es findet keine Währungsumrechnung statt. Nach dem ersten Verkauf lässt sich die Währung über „Sortiment“ nicht mehr ändern.
+
+## Anmeldung und Angemeldet bleiben
+
+Mit eurem Namen und dem vereinbarten gemeinsamen Passwort anmelden. **Angemeldet bleiben** ist standardmäßig aktiviert und hält die Anmeldung auf diesem Gerät **30 Tage** gültig. Der zuletzt verwendete Name wird dabei vorausgefüllt. Das Passwort wird dabei nicht im Browser-Speicher gespeichert. Über Abmelden endet die Sitzung sofort. Ohne die Option wird ein Browser-Sitzungscookie mit maximal zwölf Stunden Gültigkeit verwendet.
+
+Beim ersten Deploy der Passwort-Erweiterung werden die bisherigen Sitzungen ohne Passwortnachweis ungültig: einmal erneut anmelden. Alle Mitarbeiter, Umsätze und Bestände bleiben erhalten. Weitere Deployments mit demselben Passwort erhalten die angemeldeten Sitzungen. Optional kann **BAR_PASSWORD** in Render Environment oder einer lokalen .env überschrieben werden; ein Wechsel macht vorhandene Sitzungen ungültig. Der Vorgabewert ist als gesalzener Verifikator im Server hinterlegt, daher ist kein zusätzlicher Render-Wert notwendig.
 
 ## Lokal starten
 
@@ -36,7 +43,7 @@ Dann [http://localhost:3000](http://localhost:3000) öffnen. Unter Windows könn
 
 Es ist keine separate Datenbankinstallation notwendig: Für die lokale Vorschau wird eine PostgreSQL-Engine in `data/` gespeichert. Dieser Ordner wird nicht nach Render hochgeladen. Ein Neustart bewahrt die lokalen Daten.
 
-Die Anmeldung erfolgt ausschließlich mit dem Namen. Jeder angemeldete Mitarbeiter kann Artikel und Preise bearbeiten, die Währung vor dem ersten Verkauf festlegen und Buchungen mit Begründung stornieren.
+Die Anmeldung benötigt einen Namen und das vereinbarte gemeinsame Bar-Passwort. Jeder angemeldete Mitarbeiter kann Artikel und Preise bearbeiten, die Währung vor dem ersten Verkauf festlegen und Buchungen mit Begründung stornieren.
 
 ## Auf Render veröffentlichen
 
@@ -45,10 +52,10 @@ Das Projekt wird als **Web Service mit PostgreSQL** betrieben. Eine „Static Si
 1. Die Dateien aus diesem Ordner oder dem ZIP in ein neues GitHub-Repository hochladen. **`package.json`, `package-lock.json`, `render.yaml`, `server.js`, `lib/` und `public/` müssen direkt im Stamm des Repositorys liegen**, nicht in einem zusätzlichen Unterordner. `node_modules/`, `data/` und `.env` nicht hochladen.
 2. Bei [Render](https://dashboard.render.com) anmelden und **New → Blueprint** wählen.
 3. Das GitHub-Repository verbinden. Render liest die beiliegende `render.yaml` und erstellt den Web Service sowie die Datenbank in Frankfurt.
-4. Den Blueprint anlegen und warten, bis die Bereitstellung abgeschlossen ist. Render gibt euch eine `https://…onrender.com`-Adresse. Es werden keine PIN oder Zugangscodes abgefragt.
-5. Die Adresse öffnen, mit Namen anmelden und unter **Sortiment** zuerst Währung, Artikel und Preise festlegen.
+4. Den Blueprint anlegen und warten, bis die Bereitstellung abgeschlossen ist. Render gibt euch eine `https://…onrender.com`-Adresse. Das vereinbarte Bar-Passwort ist bereits eingerichtet; zusätzliche Zugangswerte sind für das Deployment nicht erforderlich.
+5. Die Adresse öffnen, mit Namen und Bar-Passwort anmelden und unter **Sortiment** zuerst Währung, Artikel und Preise festlegen.
 
-`DATABASE_URL` wird durch den Blueprint automatisch verbunden. Der Server legt Tabellen beim ersten Start an und importiert die Speise- und Shishakarte einmalig. Weitere Deployments überschreiben weder Umsätze noch eure danach geänderte Karte. Im Produktionsmodus startet die App mit der zentralen Datenbank; die Anmeldung benötigt nur einen Namen.
+`DATABASE_URL` wird durch den Blueprint automatisch verbunden. Der Server legt Tabellen beim ersten Start an und importiert die Speise- und Shishakarte einmalig. Weitere Deployments überschreiben weder Umsätze noch eure danach geänderte Karte. Im Produktionsmodus startet die App mit der zentralen Datenbank; die Anmeldung benötigt Name und Bar-Passwort.
 
 Die Konfiguration verwendet zunächst kostenlose Render-Instanzen. **Die kostenlose Render-Postgres-Datenbank läuft nach 30 Tagen ab.** Für dauerhaften Betrieb die Datenbank rechtzeitig auf einen kostenpflichtigen Tarif umstellen oder eine dauerhafte PostgreSQL-Datenbank über `DATABASE_URL` anschließen. Der kostenlose Web Service schläft nach 15 Minuten ohne Aufrufe ein; der erste Aufruf danach kann ungefähr eine Minute dauern. Für eine Kasse ohne diese Startpause den Web-Service-Tarif ändern. Aktuelle Bedingungen: [Render Free](https://render.com/docs/free).
 
@@ -64,14 +71,14 @@ Die Meldung `.env not found. Continuing without it.` ist auf Render normal: Die 
 
 ## Bedienung
 
-1. Mit eurem Namen anmelden. Bitte immer denselben Namen verwenden; verschiedene Namen erscheinen als verschiedene Mitarbeiter.
+1. Mit eurem Namen und dem Bar-Passwort anmelden; „Angemeldet bleiben“ nach Bedarf wählen. Bitte immer denselben Namen verwenden; verschiedene Namen erscheinen als verschiedene Mitarbeiter.
 2. Links einen Artikel anklicken, Menge angeben und hinzufügen.
 3. Rechts Mengen nach Bedarf ändern und Zahlungsart wählen.
 4. Nach Zahlungseingang **Verkauf buchen**. Erst die erfolgreiche Serverantwort zählt als gebuchter Umsatz.
 5. Unter **Umsätze** Mitarbeiterbeträge und Gesamtsumme für den gewünschten Zeitraum ansehen. **Gesamt** zeigt die gesamte Historie.
 6. Über **Details → Buchung stornieren** kann jeder angemeldete Mitarbeiter eine Buchung mit Grund stornieren.
 
-Anmeldungen gelten zwölf Stunden. Das Sortiment ist nach der Namensanmeldung sofort bearbeitbar. Tagesgrenzen und Zeitangaben richten sich nach `Europe/Berlin`. Die Kassenansicht aktualisiert Karte und Tageswerte alle 30 Sekunden; in der Umsatzübersicht könnt ihr **Aktualisieren** wählen.
+Mit „Angemeldet bleiben“ ist die Anmeldung auf dem Gerät 30 Tage gültig, auch nach Browser- und Server-Neustarts. Ohne diese Option gilt das Cookie für die Browser-Sitzung und die Anmeldung höchstens zwölf Stunden. Das Sortiment bleibt für alle angemeldeten Mitarbeiter bearbeitbar. Tagesgrenzen und Zeitangaben richten sich nach `Europe/Berlin`. Die Kassenansicht aktualisiert Karte und Tageswerte alle 30 Sekunden; in der Umsatzübersicht könnt ihr **Aktualisieren** wählen.
 
 Preisänderungen betreffen neue Verkäufe. Enthält ein offener Warenkorb einen alten Preis, lehnt der Server die Buchung ab: den Artikel entfernen und mit dem aktuellen Preis erneut hinzufügen. Pausierte Artikel können nicht neu gebucht werden.
 
@@ -84,6 +91,29 @@ Der erste Deploy dieser Erweiterung übernimmt **einmalig die 24 Bestände aus d
 Unter **Lager** seht ihr alle Bestände und könnt nach Artikeln suchen oder nur niedrige Bestände anzeigen. **Unter 30 Stück** erscheint eine Warnung; genau 30 zählt als ausreichend. In der Kasse stehen die Bestände direkt am Artikel. Bestand 0 sperrt den Verkauf. Alle Ansichten prüfen alle 30 Sekunden auf neu unterschrittene Bestände, die Kasse und das Lager aktualisieren ihre Bestandsanzeigen automatisch. Über **Bestand ändern** den neuen gesamten Bestand und einen Grund eingeben (Nachlieferung, Inventur, Bruch usw.). Das Bewegungsprotokoll erfasst Änderung, Bestand danach, Grund und Mitarbeiter.
 
 Neue Verkäufe buchen Bestand und Umsatz gemeinsam in einer Datenbanktransaktion. Überverkauf und doppelte Abbuchungen durch wiederholte Anfragen werden verhindert. Ein Storno neuer Verkäufe gibt die Menge einmal zurück. Buchungen, die bereits vor Einführung des Lagers bestanden, wurden in der Foto-Inventur berücksichtigt und erhöhen beim Storno deshalb nicht nachträglich den Bestand.
+
+## Einkauf und Konto
+
+Unter **Einkauf** die Menge jedes eingekauften Artikels eingeben; 0 bedeutet nicht ausgewählt. Die Seite zeigt die Einkaufssumme und den voraussichtlichen Kontostand danach. Optional einen Lieferanten/Grund ergänzen und das Buchungsdatum festlegen. **Einkauf buchen** speichert in einer gemeinsamen Datenbanktransaktion:
+
+1. Einkauf und Mengen mit den damaligen Einkaufspreisen,
+2. Zuwachs im Lager samt Bewegungsprotokoll,
+3. eine Ausgabe über den gesamten Einkaufspreis in Finanzen.
+
+Der Kontostand entspricht dem gesamten Dollar-Saldo: Kassenumsatz + Mieteinnahmen + sonstige Einnahmen − Ausgaben. Der Einkauf reduziert diesen Saldo. Bei mehr Ausgaben als Einnahmen kann er negativ werden. Den Einkauf nicht zusätzlich als manuelle Ausgabe erfassen.
+
+Die Einkaufspreise aus den Bildern und der Ergänzung werden einmalig eingespielt:
+
+| Artikel | Einkauf pro Stück |
+| --- | ---: |
+| Magische E-Shisha | 3.000 $ |
+| Trinkblut | 600 $ |
+| Magische Kohle und alle sechs weiteren Aromen, inklusive Blutmondkirsche und Frostminze | 300 $ |
+| Alle 15 weiteren Kartenartikel | 100 $ |
+
+Einkaufspreise sind für jeden angemeldeten Mitarbeiter unter **Sortiment → Bearbeiten → Einkaufspreis ($)** änderbar. Bei neuen Artikeln ohne Einkaufspreis muss dieser zuerst ergänzt werden. Pausierte Artikel können eingekauft werden. Änderungen und weitere Deployments ändern weder historische Einkäufe noch Bestände oder Geldbeträge. Wiederholte Buchungsanfragen buchen die Mengen und Kosten nur einmal.
+
+Unter **Letzte Einkäufe → Details** einen Einkauf mit Grund stornieren. Das zieht die Menge wieder vom Lager ab und storniert die Ausgabe; beide Änderungen erfolgen gemeinsam. Bereits verbrauchter Bestand darf nicht negativ werden: das Storno wird abgelehnt, wenn die nötige Menge nicht mehr vorhanden ist. Einkaufs-Ausgaben lassen sich deshalb ausschließlich über den zugehörigen Einkauf stornieren. Bei Verbindungsproblemen den gespeicherten Status über **Buchung prüfen** klären.
 
 ## VIP und Vermietung
 
@@ -106,13 +136,13 @@ Offene Lager-/VIP-/Finanzanfragen bleiben bei Verbindungsfehlern mit derselben B
 
 ## Technik und Prüfung
 
-Node.js, Express, PostgreSQL (`pg`), lokale PostgreSQL-Engine (`PGlite`), HTML/CSS/JavaScript ohne Buildschritt. Bilder und Schriften laden ohne externe Dienste. Buchungsbeträge werden serverseitig aus aktuellen Preisen berechnet, Mitarbeitende werden aus der Sitzung zugeordnet. Sitzungen verwenden HttpOnly-Cookies, im Produktionsmodus HTTPS. Die Artikelverwaltung ist für alle angemeldeten Mitarbeiter offen. Die Namensanmeldung identifiziert den Mitarbeiter anhand seiner Eingabe, nicht über ein persönliches Passwort.
+Node.js, Express, PostgreSQL (`pg`), lokale PostgreSQL-Engine (`PGlite`), HTML/CSS/JavaScript ohne Buildschritt. Bilder und Schriften laden ohne externe Dienste. Buchungsbeträge werden serverseitig aus aktuellen Preisen berechnet, Mitarbeitende werden aus der Sitzung zugeordnet. Sitzungen verwenden HttpOnly-Cookies, im Produktionsmodus HTTPS. Die Artikelverwaltung ist für alle angemeldeten Mitarbeiter offen. Das gemeinsame Bar-Passwort wird ausschließlich auf dem Server gegen einen gesalzenen scrypt-Verifikator geprüft. Namen ordnen die Buchungen weiterhin dem jeweiligen Mitarbeiter zu. Das Passwort wird weder im Frontend noch im Browser-Speicher abgelegt.
 
 ```powershell
 npm run check
 npm test
 ```
 
-Die Integrationstests prüfen Berechnung und Mitarbeiterzuordnung, doppelte und gleichzeitige Requests, Preisänderungen, ungültige Mengen, Stornos, Berliner Tagesgrenzen, CSV und dauerhafte lokale Speicherung. Zusätzlich prüfen sie die 24 Foto-Bestände, konkurrierende Verkäufe, Stock-Stornos, einmalige Datenmigration, feste Miettarife, Wochenlaufzeiten, Sommerzeit, Reservierungskonflikte sowie Finanzsummen und -stornos. Sie verwenden eigene isolierte Testdatenbanken.
+Die Integrationstests prüfen Berechnung und Mitarbeiterzuordnung, doppelte und gleichzeitige Requests, Preisänderungen, ungültige Mengen, Stornos, Berliner Tagesgrenzen, CSV und dauerhafte lokale Speicherung. Zusätzlich prüfen sie die 24 Foto-Bestände, konkurrierende Verkäufe, Stock-Stornos, einmalige Datenmigration, feste Miettarife, Wochenlaufzeiten, Sommerzeit, Reservierungskonflikte sowie Finanzsummen und -stornos sowie Passwortschutz, dauerhafte/abgelaufene Sitzungen, die 24 Einkaufspreise, Einkaufsabrechnung, Bestandszuwachs, Wiederholungen und Einkaufsstornos. Sie verwenden eigene isolierte Testdatenbanken.
 
 Dateien: `server.js` startet die App; `lib/app.js` enthält die API; `lib/database.js` verwaltet Datenbank und Tabellen; `public/` enthält die Oberfläche; `render.yaml` bereitet das Hosting vor.

@@ -45,11 +45,11 @@ test('Speise- und Shishakarte: Erstinstallation, Migration und Historie',async t
     assert.equal((await db.query("SELECT price_cents FROM order_items WHERE order_id='legacy-order'")).rows[0].price_cents,350);
     await db.query("INSERT INTO orders (id,employee_id,total_cents,currency,payment) VALUES ('usd-order','legacy',60000,'USD','cash')");
     await db.query("INSERT INTO order_items (order_id,product_id,name,price_cents,quantity) VALUES ('usd-order','cola','Cola',30000,2)");
-    const server=createApp(db).listen(0,'127.0.0.1');
+    const server=createApp(db,{accessPassword:'test-bar-access'}).listen(0,'127.0.0.1');
     await new Promise(resolve=>server.once('listening',resolve));
     try{
       const base=`http://127.0.0.1:${server.address().port}/api`;
-      const login=await fetch(base+'/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Altbestand'})});
+      const login=await fetch(base+'/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Altbestand',password:'test-bar-access'})});
       const headers={Cookie:login.headers.get('set-cookie').split(';')[0]};
       const usd=await (await fetch(base+'/stats',{headers})).json();
       const eur=await (await fetch(base+'/stats?currency=EUR',{headers})).json();
@@ -71,7 +71,7 @@ test('Speise- und Shishakarte: Erstinstallation, Migration und Historie',async t
     await initializeDatabase(db);
     assert.equal((await db.query("SELECT price_cents FROM products WHERE id='cola'")).rows[0].price_cents,42000);
     assert.equal((await db.query("SELECT active FROM products WHERE id='magische-e-shisha'")).rows[0].active,false);
-    assert.equal((await db.query('SELECT COUNT(*)::int AS count FROM schema_migrations')).rows[0].count,2);
+    assert.equal((await db.query('SELECT COUNT(*)::int AS count FROM schema_migrations')).rows[0].count,3);
     assert.equal((await db.query('SELECT COUNT(*)::int AS count FROM orders')).rows[0].count,2);
   });
 });

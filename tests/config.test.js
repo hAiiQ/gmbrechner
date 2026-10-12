@@ -19,6 +19,14 @@ test('Alte oder leere Zugangseinstellungen behindern den Start nicht',()=>{
   }
 });
 
+test('Optionales Bar-Passwort überschreibt den Vorgabewert ohne Offenlegung bei Konfigurationsfehlern',()=>{
+  assert.equal(loadConfiguration({...valid,BAR_PASSWORD:'test-password'}).accessPassword,'test-password');
+  assert.equal(loadConfiguration({...valid,BAR_PASSWORD:''}).accessPassword,undefined);
+  assert.throws(()=>loadConfiguration({...valid,BAR_PASSWORD:'xyz'}),error=>{
+    assert.ok(error instanceof ConfigurationError);assert.match(error.message,/BAR_PASSWORD/);assert.ok(!error.message.includes('xyz'));return true;
+  });
+});
+
 test('Ungültige Datenbank- und Portwerte werden ohne Ausgabe von Geheimnissen erkannt',()=>{
   for(const [key,value] of [['DATABASE_URL',''],['DATABASE_URL','https://private-db-password.example'],['DATABASE_URL','private-invalid-address'],['PORT','not-a-port']]){
     assert.throws(()=>loadConfiguration({...valid,[key]:value}),error=>{

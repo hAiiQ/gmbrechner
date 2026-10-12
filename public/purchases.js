@@ -1,0 +1,46 @@
+async function renderPurchases(epoch){
+  $('#main').innerHTML=`${pageHeading('Der Einkauf.','Nachschub fürs Lager. Klar verbucht fürs Konto.','Einkauf & Waren')}<div id="purchase-content" class="table-empty">Einkauf wird geladen …</div>`;
+  try{
+    const [data,finance]=await Promise.all([api('/purchases'),api('/finance')]);
+    if(epoch!==state.epoch)return;
+    state.purchaseProducts=data.products;state.accountBalance=Number(finance.totals.balance_cents);
+    if(!state.operationPending){
+      state.purchaseCart=state.purchaseCart.flatMap(i=>{const p=data.products.find(p=>p.id===i.id);return p?.purchase_price_cents?[{...i,name:p.name,unitCostCents:p.purchase_price_cents}]:[];});saveDraft();
+    }
+    const el=$('#purchase-content');el.className='';
+    el.innerHTML=`<div class="stat-cards inventory-summary purchase-metrics">${[['Kontostand',money(state.accountBalance,'USD'),'coin','Gesamte Einnahmen abzüglich Ausgaben'],['Einkäufe gesamt',money(data.totals.total_cents,'USD'),'box','Alle gebuchten Einkäufe'],['Einkäufe',data.totals.count,'receipt','Stornos ausgeschlossen']].map(([label,value,i,hint])=>`<div class="stat-card"><div class="metric-label">${label}${icon(i)}</div><strong>${value}</strong><div class="helper">${hint}</div></div>`).join('')}</div><form id="purchase-form"><div class="purchase-layout"><section class="purchase-catalog"><div class="catalog-header"><h2 class="section-title">Nachschub bestellen <span class="item-count">${data.products.length} Artikel</span></h2><div class="search">${icon('search')}<input id="purchase-search" type="search" placeholder="Artikel suchen …" aria-label="Einkaufsartikel suchen"></div></div><div class="purchase-grid" id="purchase-grid">${data.products.map(p=>`<article class="purchase-card" data-purchase-card="${esc(p.name+' '+p.category)}"><div class="inventory-card-top"><span class="product-icon">${icon(categoryIcon(p.category))}</span>${stockBadge(p)}</div><h2>${esc(p.name)}</h2><p>${esc(p.category)}${p.active?'':' · pausiert'}</p><div class="purchase-card-bottom"><div><span class="mini-label">Einkauf pro Stück</span><strong>${p.purchase_price_cents?money(p.purchase_price_cents,'USD'):'Preis fehlt'}</strong></div>${p.purchase_price_cents?`<div class="buy-stepper"><button type="button" data-action="buy-minus" data-id="${esc(p.id)}" aria-label="Einkaufsmenge von ${esc(p.name)} verringern" ${state.operationPending?'disabled':''}>${icon('minus')}</button><input type="number" min="0" max="100000" step="1" value="${state.purchaseCart.find(i=>i.id===p.id)?.quantity||0}" data-buy-quantity="${esc(p.id)}" aria-label="Einkaufsmenge von ${esc(p.name)}" ${state.operationPending?'disabled':''}><button type="button" data-action="buy-plus" data-id="${esc(p.id)}" aria-label="Einkaufsmenge von ${esc(p.name)} erhöhen" ${state.operationPending?'disabled':''}>${icon('plus')}</button></div>`:'<button type="button" class="detail-button" data-action="navigate" data-view="admin">Im Sortiment ergänzen</button>'}</div></article>`).join('')}</div><p class="catalog-note">${icon('info')}Mengen eintragen. Bestand und Konto werden beim Buchen gemeinsam aktualisiert.</p></section><aside class="receipt purchase-summary"><div class="receipt-header"><div><div class="eyebrow">Einkauf</div><h2>Wareneinkauf</h2></div>${icon('box')}</div><div class="receipt-employee">${icon('user')}Gebucht von <strong>${esc(state.employee.name)}</strong></div><div class="cart-items" id="purchase-lines"></div><div class="receipt-summary"><div class="field"><label for="purchase-date">Buchungsdatum</label><input id="purchase-date" name="occurred_on" type="date" min="2000-01-01" max="2100-12-31" value="${today()}" required ${state.operationPending?'disabled':''}></div><div class="field"><label for="purchase-reason">Grund / Lieferant (optional)</label><input id="purchase-reason" name="reason" maxlength="200" placeholder="Wareneinkauf" ${state.operationPending?'disabled':''}></div><div class="receipt-total"><span>Einkauf gesamt</span><strong id="purchase-total">—</strong></div><div class="purchase-balance"><span>Konto danach</span><strong id="purchase-balance">—</strong></div><p class="error" role="alert"></p><button class="button gold full" type="submit" id="book-purchase"><span>Einkauf buchen</span>${icon('arrow')}</button><p class="receipt-note">Die Kosten werden als Ausgabe in Finanzen erfasst.<br>Der Bestand steigt um die eingekauften Mengen.</p></div></aside></div></form><section class="panel movement-panel"><div class="panel-heading"><h2>Letzte Einkäufe</h2><button class="detail-button" data-action="refresh">${icon('clock')}Aktualisieren</button></div>${data.purchases.length?`<div class="table-scroll"><table><thead><tr><th>Datum</th><th>Mitarbeiter</th><th>Grund</th><th class="right">Kosten</th><th>Status</th><th></th></tr></thead><tbody>${data.purchases.map(p=>`<tr><td>${date(p.occurred_on+'T12:00:00Z')}</td><td>${esc(p.employee_name)}</td><td class="reason-cell">${esc(p.reason)}</td><td class="right">${money(p.total_cents,p.currency)}</td><td><span class="badge ${p.voided_at?'void':''}">${p.voided_at?'Storniert':'Gebucht'}</span></td><td><button class="detail-button" data-action="purchase-details" data-id="${esc(p.id)}">Details ${icon('arrow')}</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="table-empty">Noch keine Einkäufe gebucht.</div>'}<div class="table-caption">Die neuesten 50 Einkäufe. Änderungen der Einkaufspreise betreffen zukünftige Einkäufe.</div></section>`;
+    $('#purchase-search').addEventListener('input',event=>{
+      const search=event.target.value.toLocaleLowerCase('de-DE');for(const card of document.querySelectorAll('[data-purchase-card]'))card.hidden=!card.dataset.purchaseCard.toLocaleLowerCase('de-DE').includes(search);
+    });
+    for(const input of document.querySelectorAll('[data-buy-quantity]'))input.addEventListener('input',()=>changePurchase(input.dataset.buyQuantity,Number(input.value),input));
+    drawPurchaseSummary();
+    operationForm($('#purchase-form'),'/purchases',form=>{
+      if(!state.purchaseCart.length)throw new Error('Bitte eine Einkaufsmenge eintragen.');
+      return {items:state.purchaseCart.map(i=>({productId:i.id,quantity:i.quantity,unitCostCents:i.unitCostCents})),occurred_on:form.elements.occurred_on.value,reason:form.elements.reason.value||'Wareneinkauf'};
+    });
+  }catch(error){if(epoch===state.epoch&&$('#purchase-content'))$('#purchase-content').innerHTML=`<p class="error">${esc(error.message)}</p><button class="button" data-action="refresh">Erneut laden</button>`;}
+}
+function changePurchase(id,value,input){
+  if(state.operationPending)return;
+  const previous=state.purchaseCart.find(i=>i.id===id);
+  const quantity=typeof value==='function'?value(previous?.quantity||0):value;
+  if(!Number.isInteger(quantity)||quantity<0||quantity>100000){if(input)input.setCustomValidity('Bitte eine ganze Menge von 0 bis 100.000 eingeben.');return;}
+  input?.setCustomValidity('');
+  const p=state.purchaseProducts.find(p=>p.id===id);if(!p?.purchase_price_cents)return;
+  if(quantity===0)state.purchaseCart=state.purchaseCart.filter(i=>i.id!==id);
+  else if(previous)previous.quantity=quantity;
+  else state.purchaseCart.push({id,name:p.name,unitCostCents:p.purchase_price_cents,quantity});
+  for(const el of document.querySelectorAll('[data-buy-quantity]'))if(el.dataset.buyQuantity===id&&el!==input){el.value=quantity;el.setCustomValidity('');}
+  saveDraft();drawPurchaseSummary();
+}
+function drawPurchaseSummary(){
+  if(!$('#purchase-lines'))return;
+  const total=state.purchaseCart.reduce((sum,i)=>sum+i.quantity*i.unitCostCents,0);
+  $('#purchase-lines').innerHTML=state.purchaseCart.length?state.purchaseCart.map(i=>`<div class="cart-line"><div class="cart-line-top"><span>${i.quantity} × ${esc(i.name)}</span><strong>${money(i.unitCostCents*i.quantity,'USD')}</strong></div><div class="unit-price">${money(i.unitCostCents,'USD')} Einkauf pro Stück</div></div>`).join(''):'<div class="cart-empty">'+icon('box')+'<h3>Nachschub gefällig?</h3><p>Trage links die Mengen ein.</p></div>';
+  $('#purchase-total').textContent=money(total,'USD');$('#purchase-balance').textContent=money(state.accountBalance-total,'USD');
+  $('#book-purchase').disabled=!state.purchaseCart.length||!!state.operationPending;
+}
+async function purchaseDetails(id){
+  const {purchase:p,items}=await api(`/purchases/${encodeURIComponent(id)}`);
+  openModal(`${modalHead('Einkauf #'+id.slice(0,8).toUpperCase(),`${date(p.occurred_on+'T12:00:00Z')} · ${p.employee_name}`,'Einkaufsdetails')}<div class="modal-body"><p class="helper">${esc(p.reason)}</p>${items.map(i=>`<div class="detail-line"><span>${i.quantity} × ${esc(i.name)}<small>${money(i.unit_cost_cents,'USD')} pro Stück</small></span><strong>${money(i.quantity*i.unit_cost_cents,'USD')}</strong></div>`).join('')}<div class="detail-total"><span>Kosten</span><strong>${money(p.total_cents,'USD')}</strong></div>${p.voided_at?`<p class="void-note">Storniert: ${esc(p.void_reason)}</p>`:`<div class="modal-actions"><button class="button danger" data-action="void-purchase" data-id="${esc(id)}">Einkauf stornieren</button><button class="button" data-action="close-modal">Schließen</button></div>`}</div>`);
+}

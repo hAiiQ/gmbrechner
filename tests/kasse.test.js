@@ -10,7 +10,7 @@ import { createApp } from '../lib/app.js';
 test('Kasse: Integration mit echter PostgreSQL-Engine', async t => {
   const db=await openDatabase({memory:true});
   await initializeDatabase(db);
-  const app=createApp(db,{loginLimit:1000});
+  const app=createApp(db,{loginLimit:1000,accessPassword:'test-bar-access'});
   const server=app.listen(0,'127.0.0.1');
   await new Promise(resolve=>server.once('listening',resolve));
   const base=`http://127.0.0.1:${server.address().port}/api`;
@@ -21,11 +21,11 @@ test('Kasse: Integration mit echter PostgreSQL-Engine', async t => {
     const data=type.includes('json')?await res.json():await res.text();
     return {status:res.status,data,cookie:res.headers.get('set-cookie')?.split(';')[0],headers:res.headers};
   }
-  const login=async name=>request('/login',{method:'POST',body:{name}});
+  const login=async name=>request('/login',{method:'POST',body:{name,password:'test-bar-access'}});
   let alice,bob,aliceId,firstOrder,secondOrder;
   const sale=(items,extra={})=>({id:randomUUID(),payment:'cash',currency:'USD',items:items.map(([productId,quantity,unitPriceCents])=>({productId,quantity,unitPriceCents})),...extra});
 
-  await t.test('Anmeldung nur mit Name, gültige Sitzung und CSRF-Prüfung',async()=>{
+  await t.test('Anmeldung mit Name und Passwort, gültige Sitzung und CSRF-Prüfung',async()=>{
     assert.equal((await request('/health')).status,200);
     assert.equal((await request('/products')).status,401);
     assert.equal((await request('/login',{method:'POST',body:{name:''}})).status,400);
