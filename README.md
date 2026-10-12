@@ -30,6 +30,12 @@ Mit eurem Namen und dem vereinbarten gemeinsamen Passwort anmelden. **Angemeldet
 
 Beim ersten Deploy der Passwort-Erweiterung werden die bisherigen Sitzungen ohne Passwortnachweis ungültig: einmal erneut anmelden. Alle Mitarbeiter, Umsätze und Bestände bleiben erhalten. Weitere Deployments mit demselben Passwort erhalten die angemeldeten Sitzungen. Optional kann **BAR_PASSWORD** in Render Environment oder einer lokalen .env überschrieben werden; ein Wechsel macht vorhandene Sitzungen ungültig. Der Vorgabewert ist als gesalzener Verifikator im Server hinterlegt, daher ist kein zusätzlicher Render-Wert notwendig.
 
+## FiveM-Tablet und eingebettete Browser
+
+Die Kasse erlaubt das Öffnen in einem iframe, wie es FiveM-Tablets verwenden. `X-Frame-Options` und die CSP-Direktive `frame-ancestors` werden deshalb nicht gesetzt. Die übrigen Sicherheitsheader bleiben aktiv. In Render verwendet die Anmeldung ein `HttpOnly; Secure; SameSite=None`-Cookie, damit sie im eingebetteten HTTPS-Browser funktioniert. Schreibende API-Anfragen benötigen weiterhin JSON und dürfen nur vom Ursprung der Kasse kommen.
+
+Nach dem Update den Tablet-Browser neu laden und dort gegebenenfalls einmal mit Name und Bar-Passwort anmelden. Falls das Tablet grundsätzlich Cookies von eingebetteten Websites blockiert oder seine eigene Liste erlaubter Websites verwendet, muss dies zusätzlich in der Tablet-Konfiguration erlaubt werden. Das Update verändert keine Umsätze, Bestände oder Einkaufspreise.
+
 ## Lokal starten
 
 Voraussetzung: **Node.js 22 ab 22.17**. Im Projektordner ausführen:
