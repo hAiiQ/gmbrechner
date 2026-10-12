@@ -36,7 +36,7 @@ const drawings = {
 const icon = (name,cls='') => `<svg class="icon ${cls}" viewBox="0 0 24 24" aria-hidden="true">${drawings[name]||drawings.glass}</svg>`;
 const categoryIcon = category => ({Essen:'food','Alkoholische Getränke':'whiskey','Alkoholfreie Getränke':'water','Kaffeespezialitäten':'coffee','Zigaretten & Zigarren':'cigar',Spezielles:'wine',Shisha:'shisha',Aromen:'aroma',Cocktails:'cocktail',Longdrinks:'glass',Spirituosen:'whiskey','Bier & Wein':'wine',Alkoholfrei:'water',Snacks:'snack'}[category] || 'glass');
 const initials = name => name.trim().split(/\s+/).slice(0,2).map(s=>s[0]).join('').toUpperCase();
-const state = { config:null,employee:null,view:'kasse',products:[],cart:[],purchaseCart:[],payment:'cash',requestId:null,pending:null,operationPending:null,category:'Alle',search:'',period:'today',from:null,to:null,statsCurrency:null,connected:true,busy:false,epoch:0,lastOrder:null };
+const state = { config:null,employee:null,view:'kasse',products:[],cart:[],purchaseCart:[],payment:'cash',discountPercent:0,discountValid:true,requestId:null,pending:null,operationPending:null,category:'Alle',search:'',period:'today',from:null,to:null,statsCurrency:null,connected:true,busy:false,epoch:0,lastOrder:null };
 const modal = $('#modal');
 let toastTimer;
 function toast(message,error=false) {
@@ -84,15 +84,15 @@ async function api(url,{method='GET',body}={}) {
 }
 function saveDraft() {
   if(!state.employee)return;
-  try {localStorage.setItem(`gentlemans-cart-${state.employee.id}`,JSON.stringify({cart:state.cart,payment:state.payment,requestId:state.requestId,pending:state.pending,operationPending:state.operationPending,purchaseCart:state.purchaseCart}));} catch {/* Die zentrale Buchung bleibt unabhängig vom lokalen Warenkorb. */}
+  try {localStorage.setItem(`gentlemans-cart-${state.employee.id}`,JSON.stringify({cart:state.cart,payment:state.payment,discountPercent:state.discountPercent,requestId:state.requestId,pending:state.pending,operationPending:state.operationPending,purchaseCart:state.purchaseCart}));} catch {/* Die zentrale Buchung bleibt unabhängig vom lokalen Warenkorb. */}
 }
 function restoreDraft() {
-  state.cart=[];state.purchaseCart=[];state.payment='cash';state.requestId=crypto.randomUUID();state.pending=null;state.operationPending=null;state.lastOrder=null;
+  state.cart=[];state.purchaseCart=[];state.payment='cash';state.discountPercent=0;state.discountValid=true;state.requestId=crypto.randomUUID();state.pending=null;state.operationPending=null;state.lastOrder=null;
   try {
     const saved=JSON.parse(localStorage.getItem(`gentlemans-cart-${state.employee.id}`)||'null');
     if(saved && Array.isArray(saved.cart)){
       state.cart=saved.cart.filter(p=>p && typeof p.id==='string' && typeof p.name==='string' && Number.isInteger(p.price_cents) && Number.isInteger(p.quantity) && p.quantity>0 && p.quantity<=999);
-      state.payment=['cash','card'].includes(saved.payment)?saved.payment:'cash';state.requestId=saved.requestId||crypto.randomUUID();state.pending=saved.pending||null;state.operationPending=saved.operationPending||null;state.purchaseCart=Array.isArray(saved.purchaseCart)?saved.purchaseCart.filter(i=>i&&typeof i.id==='string'&&typeof i.name==='string'&&Number.isInteger(i.unitCostCents)&&i.unitCostCents>0&&Number.isInteger(i.quantity)&&i.quantity>0&&i.quantity<=100000):[];
+      state.payment=['cash','card'].includes(saved.payment)?saved.payment:'cash';state.requestId=saved.requestId||crypto.randomUUID();state.pending=saved.pending||null;state.operationPending=saved.operationPending||null;const savedDiscount=state.pending?(state.pending.discount_percent??0):(saved.discountPercent??0);state.discountPercent=validDiscountPercent(savedDiscount)?savedDiscount:0;state.purchaseCart=Array.isArray(saved.purchaseCart)?saved.purchaseCart.filter(i=>i&&typeof i.id==='string'&&typeof i.name==='string'&&Number.isInteger(i.unitCostCents)&&i.unitCostCents>0&&Number.isInteger(i.quantity)&&i.quantity>0&&i.quantity<=100000):[];
     }
   }catch{}
 }
@@ -149,13 +149,34 @@ function renderProducts() {
   const products=state.products.filter(p=>(state.category==='Alle'||p.category===state.category)&&`${p.name} ${p.description} ${p.category}`.toLocaleLowerCase('de-DE').includes(state.search.toLocaleLowerCase('de-DE')));
   $('#product-grid').innerHTML=products.length?products.map(p=>`<button class="product" data-action="select-product" data-id="${esc(p.id)}" ${state.pending||p.stock_quantity===0?'disabled':''} aria-label="${esc(p.name)}, ${esc(money(p.price_cents))}, Menge auswählen"><span class="product-icon">${icon(categoryIcon(p.category))}</span><span class="product-copy"><span class="product-name">${esc(p.name)}</span><span class="product-desc">${esc(p.description)}</span>${stockBadge(p)}<span class="product-price">${money(p.price_cents)}</span></span><span class="product-plus">${icon('plus')}</span></button>`).join(''):`<div class="empty-state">${icon('search')}<h3>Hier ist es noch leer.</h3><p>${state.products.length?'Kein Artikel passt zu deiner Suche.':'Füge in der Verwaltung die ersten Artikel hinzu.'}</p></div>`;
 }
-function cartTotal(){return state.cart.reduce((sum,p)=>sum+p.quantity*p.price_cents,0);}
+function validDiscountPercent(value){return typeof value==='number'&&Number.isFinite(value)&&value>=0&&value<=100&&Math.round(value*100)/100===value;}
+const percentText=value=>new Intl.NumberFormat('de-DE',{maximumFractionDigits:2}).format(value);
+function cartSubtotal(){return state.cart.reduce((sum,p)=>sum+p.quantity*p.price_cents,0);}
+function cartDiscount(){return Math.round(cartSubtotal()*Math.round(state.discountPercent*100)/10000);}
+function cartTotal(){return cartSubtotal()-cartDiscount();}
+function updateCartTotals(){
+  if($('#cart-subtotal'))$('#cart-subtotal').textContent=money(cartSubtotal());
+  if($('#cart-discount-label'))$('#cart-discount-label').textContent='Rabatt ('+percentText(state.discountPercent)+' %)';
+  if($('#cart-discount-amount'))$('#cart-discount-amount').textContent='− '+money(cartDiscount());
+  if($('#cart-total'))$('#cart-total').textContent=money(cartTotal());
+  if($('#checkout-button'))$('#checkout-button').disabled=!state.cart.length||state.busy||!state.discountValid;
+  const mobileBar=$('#mobile-cart-bar'),count=state.cart.reduce((sum,p)=>sum+p.quantity,0);
+  if(mobileBar)mobileBar.innerHTML=count?`<div><span class="mini-label">${count} Artikel in der Bestellung</span><strong class="mini-total">${money(cartTotal())}</strong></div><button class="button gold" data-action="show-cart">Bestellung ansehen ${icon('arrow')}</button>`:'';
+}
+
 function renderCart() {
   const receipt=$('#receipt');if(!receipt)return;
-  const count=state.cart.reduce((sum,p)=>sum+p.quantity,0),locked=state.busy||!!state.pending;
-  receipt.innerHTML=`<div class="receipt-header"><div><div class="eyebrow">Gentlemans Bar</div><h2>Aktuelle Bestellung</h2></div><button class="icon-button" data-action="clear-cart" aria-label="Warenkorb leeren" title="Warenkorb leeren" ${!count||locked?'disabled':''}>${icon('trash')}</button></div><div class="receipt-employee">${icon('user')}Bedient von <strong>${esc(state.employee.name)}</strong></div><div class="cart-items">${state.cart.length?state.cart.map(p=>`<div class="cart-line"><div class="cart-line-top"><span>${esc(p.name)}</span><strong>${money(p.price_cents*p.quantity)}</strong></div><div class="cart-line-bottom"><span class="unit-price">${money(p.price_cents)} pro Stück</span><div class="line-controls"><div class="quantity-controls"><button data-action="cart-minus" data-id="${esc(p.id)}" aria-label="Menge von ${esc(p.name)} verringern" ${locked?'disabled':''}>${icon('minus')}</button><input data-cart-quantity="${esc(p.id)}" aria-label="Menge von ${esc(p.name)}" type="number" min="1" max="999" step="1" value="${p.quantity}" ${locked?'disabled':''}><button data-action="cart-plus" data-id="${esc(p.id)}" aria-label="Menge von ${esc(p.name)} erhöhen" ${locked||p.quantity>=999?'disabled':''}>${icon('plus')}</button></div><button class="icon-button" data-action="cart-remove" data-id="${esc(p.id)}" aria-label="${esc(p.name)} entfernen" ${locked?'disabled':''}>${icon('close')}</button></div></div></div>`).join(''):`<div class="cart-empty">${icon('cocktail')}<h3>Noch eine Runde?</h3><p>Wähle links einen Artikel aus.<br>Hier entsteht deine Bestellung.</p></div>`}</div><div class="receipt-summary"><div class="receipt-subtotal"><span>${count} ${count===1?'Artikel':'Artikel'} · ${state.cart.length} ${state.cart.length===1?'Position':'Positionen'}</span><span>${time(new Date())} Uhr</span></div><div class="receipt-total"><span>Gesamt</span><strong>${money(cartTotal())}</strong></div><div class="payment-options" aria-label="Zahlungsart"><button class="payment-option ${state.payment==='cash'?'active':''}" data-action="payment" data-payment="cash" aria-pressed="${state.payment==='cash'}" ${locked?'disabled':''}>${icon('coin')}Bar</button><button class="payment-option ${state.payment==='card'?'active':''}" data-action="payment" data-payment="card" aria-pressed="${state.payment==='card'}" ${locked?'disabled':''}>${icon('card')}Karte</button></div>${state.pending?'<p class="pending-note">Der Buchungsstatus ist noch offen. Prüfe die Buchung erneut, bevor du weiterarbeitest.</p>':''}<button class="button gold full" data-action="checkout" ${!count||state.busy?'disabled':''}><span>${state.busy?'Wird gespeichert …':state.pending?'Buchung prüfen':'Verkauf buchen'}</span>${icon(state.busy?'clock':'arrow')}</button><p class="receipt-note">${state.lastOrder?`<button class="detail-button" data-action="order-details" data-id="${esc(state.lastOrder.id)}">Letzte Buchung · ${money(state.lastOrder.total_cents,state.lastOrder.currency)} ${icon('receipt')}</button>`:'Der Verkauf wird deinem Namen zugeordnet.'}</p></div>`;
-  const mobileBar=$('#mobile-cart-bar');
-  if(mobileBar)mobileBar.innerHTML=count?`<div><span class="mini-label">${count} Artikel in der Bestellung</span><strong class="mini-total">${money(cartTotal())}</strong></div><button class="button gold" data-action="show-cart">Bestellung ansehen ${icon('arrow')}</button>`:'';
+  const count=state.cart.reduce((sum,p)=>sum+p.quantity,0),locked=state.busy||!!state.pending;state.discountValid=true;
+  receipt.innerHTML=`<div class="receipt-header"><div><div class="eyebrow">Gentlemans Bar</div><h2>Aktuelle Bestellung</h2></div><button class="icon-button" data-action="clear-cart" aria-label="Warenkorb leeren" title="Warenkorb leeren" ${!count||locked?'disabled':''}>${icon('trash')}</button></div><div class="receipt-employee">${icon('user')}Bedient von <strong>${esc(state.employee.name)}</strong></div><div class="cart-items">${state.cart.length?state.cart.map(p=>`<div class="cart-line"><div class="cart-line-top"><span>${esc(p.name)}</span><strong>${money(p.price_cents*p.quantity)}</strong></div><div class="cart-line-bottom"><span class="unit-price">${money(p.price_cents)} pro Stück</span><div class="line-controls"><div class="quantity-controls"><button data-action="cart-minus" data-id="${esc(p.id)}" aria-label="Menge von ${esc(p.name)} verringern" ${locked?'disabled':''}>${icon('minus')}</button><input data-cart-quantity="${esc(p.id)}" aria-label="Menge von ${esc(p.name)}" type="number" min="1" max="999" step="1" value="${p.quantity}" ${locked?'disabled':''}><button data-action="cart-plus" data-id="${esc(p.id)}" aria-label="Menge von ${esc(p.name)} erhöhen" ${locked||p.quantity>=999?'disabled':''}>${icon('plus')}</button></div><button class="icon-button" data-action="cart-remove" data-id="${esc(p.id)}" aria-label="${esc(p.name)} entfernen" ${locked?'disabled':''}>${icon('close')}</button></div></div></div>`).join(''):`<div class="cart-empty">${icon('cocktail')}<h3>Noch eine Runde?</h3><p>Wähle links einen Artikel aus.<br>Hier entsteht deine Bestellung.</p></div>`}</div><div class="receipt-summary"><div class="receipt-subtotal"><span>${count} ${count===1?'Artikel':'Artikel'} · ${state.cart.length} ${state.cart.length===1?'Position':'Positionen'}</span><span>${time(new Date())} Uhr</span></div><div class="receipt-value-line"><span>Zwischensumme</span><strong id="cart-subtotal">${money(cartSubtotal())}</strong></div><div class="receipt-discount-field"><label for="receipt-discount">Rabatt</label><div class="receipt-percent-input"><input id="receipt-discount" aria-label="Rabatt (%)" type="number" min="0" max="100" step="0.01" inputmode="decimal" value="${state.discountPercent}" required ${locked||!count?'disabled':''}><span>%</span></div></div><p id="receipt-discount-error" class="receipt-discount-error" role="alert"></p><div class="receipt-value-line receipt-discount-line"><span id="cart-discount-label">Rabatt (${percentText(state.discountPercent)} %)</span><strong id="cart-discount-amount">− ${money(cartDiscount())}</strong></div><div class="receipt-total"><span>Gesamt</span><strong id="cart-total" aria-live="polite">${money(cartTotal())}</strong></div><div class="payment-options" aria-label="Zahlungsart"><button class="payment-option ${state.payment==='cash'?'active':''}" data-action="payment" data-payment="cash" aria-pressed="${state.payment==='cash'}" ${locked?'disabled':''}>${icon('coin')}Bar</button><button class="payment-option ${state.payment==='card'?'active':''}" data-action="payment" data-payment="card" aria-pressed="${state.payment==='card'}" ${locked?'disabled':''}>${icon('card')}Karte</button></div>${state.pending?'<p class="pending-note">Der Buchungsstatus ist noch offen. Prüfe die Buchung erneut, bevor du weiterarbeitest.</p>':''}<button id="checkout-button" class="button gold full" data-action="checkout" ${!count||state.busy?'disabled':''}><span>${state.busy?'Wird gespeichert …':state.pending?'Buchung prüfen':'Verkauf buchen'}</span>${icon(state.busy?'clock':'arrow')}</button><p class="receipt-note">${state.lastOrder?`<button class="detail-button" data-action="order-details" data-id="${esc(state.lastOrder.id)}">Letzte Buchung · ${money(state.lastOrder.total_cents,state.lastOrder.currency)} ${icon('receipt')}</button>`:'Der Verkauf wird deinem Namen zugeordnet.'}</p></div>`;
+  $('#receipt-discount').addEventListener('input',event=>{
+    if(state.busy||state.pending)return;
+    const input=event.currentTarget,percent=input.valueAsNumber;
+    state.discountValid=input.validity.valid&&validDiscountPercent(percent);
+    $('#receipt-discount-error').textContent=state.discountValid?'':'Bitte 0–100 % eingeben, mit höchstens zwei Nachkommastellen.';
+    if(state.discountValid){state.discountPercent=percent;state.requestId=crypto.randomUUID();saveDraft();}
+    updateCartTotals();
+  });
+  updateCartTotals();
 }
 async function refreshMetrics() {
   const d=today();const result=await api(`/stats?from=${d}&to=${d}`);
@@ -189,12 +210,14 @@ function changeCart(id,change) {
   const product=state.products.find(p=>p.id===id);
   if(value>0&&value>(product?.stock_quantity??0)){toast(`Nur noch ${product?.stock_quantity??0} Stück verfügbar.`,true);renderCart();return;}
   if(value===0)state.cart=state.cart.filter(p=>p.id!==id);else line.quantity=value;
+  if(!state.cart.length)state.discountPercent=0;
   state.requestId=crypto.randomUUID();saveDraft();renderCart();
 }
 async function checkout() {
   if(state.busy||!state.cart.length)return;
+  if(!state.discountValid||!validDiscountPercent(state.discountPercent)){toast('Bitte einen gültigen Rabatt von 0 bis 100 % eingeben.',true);$('#receipt-discount')?.focus();return;}
   state.busy=true;
-  if(!state.pending)state.pending={id:state.requestId||crypto.randomUUID(),items:state.cart.map(p=>({productId:p.id,quantity:p.quantity,unitPriceCents:p.price_cents})),payment:state.payment,currency:state.config.currency};
+  if(!state.pending)state.pending={id:state.requestId||crypto.randomUUID(),items:state.cart.map(p=>({productId:p.id,quantity:p.quantity,unitPriceCents:p.price_cents})),payment:state.payment,currency:state.config.currency,discount_percent:state.discountPercent};
   saveDraft();renderCart();renderProducts();
   let result;
   try{result=await api('/orders',{method:'POST',body:state.pending});}
@@ -202,7 +225,7 @@ async function checkout() {
     if(error.status>=400&&error.status<500){state.pending=null;state.requestId=crypto.randomUUID();}
     state.busy=false;saveDraft();if(state.employee){renderCart();if($('#product-grid'))renderProducts();}toast(error.message,true);return;
   }
-  state.busy=false;state.pending=null;state.cart=[];state.requestId=crypto.randomUUID();state.lastOrder=result.order;saveDraft();
+  state.busy=false;state.pending=null;state.cart=[];state.discountPercent=0;state.discountValid=true;state.requestId=crypto.randomUUID();state.lastOrder=result.order;saveDraft();
   try{state.products=(await api('/products')).products;refreshStockNotice();}catch{}
   renderCart();if($('#product-grid'))renderProducts();toast(`${money(result.order.total_cents,result.order.currency)} erfolgreich für ${state.employee.name} gebucht.`);
   refreshMetrics().catch(()=>toast('Verkauf gespeichert. Die Umsatzübersicht wird nach Wiederherstellung der Verbindung aktualisiert.',true));
@@ -255,7 +278,7 @@ function productForm(id) {
 async function orderDetails(id) {
   try{
     const {order,items}=await api(`/orders/${encodeURIComponent(id)}`);
-    openModal(`${modalHead('Buchung #'+order.id.slice(0,8).toUpperCase(),`${date(order.created_at)} · ${time(order.created_at)} Uhr`,'Buchungsdetails')}<div class="modal-body"><div class="detail-meta"><span>${esc(order.employee_name)}</span><span>${order.payment==='cash'?'Barzahlung':'Kartenzahlung'}</span></div>${items.map(i=>`<div class="detail-line"><span>${i.quantity} × ${esc(i.name)}<small>${money(i.price_cents,order.currency)} pro Stück</small></span><span>${money(i.price_cents*i.quantity,order.currency)}</span></div>`).join('')}<div class="detail-total"><span>Gesamt</span><strong>${money(order.total_cents,order.currency)}</strong></div>${order.voided_at?`<p class="void-note">Storniert am ${date(order.voided_at)} um ${time(order.voided_at)} Uhr.<br>Grund: ${esc(order.void_reason)}</p>`:`<div class="modal-actions"><button class="button danger" data-action="void-order" data-id="${esc(id)}">Buchung stornieren</button><button class="button" data-action="close-modal">Schließen</button></div>`}</div>`);
+    openModal(`${modalHead('Buchung #'+order.id.slice(0,8).toUpperCase(),`${date(order.created_at)} · ${time(order.created_at)} Uhr`,'Buchungsdetails')}<div class="modal-body"><div class="detail-meta"><span>${esc(order.employee_name)}</span><span>${order.payment==='cash'?'Barzahlung':'Kartenzahlung'}</span></div>${items.map(i=>`<div class="detail-line"><span>${i.quantity} × ${esc(i.name)}<small>${money(i.price_cents,order.currency)} pro Stück</small></span><span>${money(i.price_cents*i.quantity,order.currency)}</span></div>`).join('')}${order.discount_basis_points>0?`<div class="detail-line"><span>Zwischensumme</span><strong>${money(order.total_cents+order.discount_cents,order.currency)}</strong></div><div class="detail-line detail-discount"><span>Rabatt (${percentText(order.discount_basis_points/100)} %)</span><strong>− ${money(order.discount_cents,order.currency)}</strong></div>`:''}<div class="detail-total"><span>Gesamt</span><strong>${money(order.total_cents,order.currency)}</strong></div>${order.voided_at?`<p class="void-note">Storniert am ${date(order.voided_at)} um ${time(order.voided_at)} Uhr.<br>Grund: ${esc(order.void_reason)}</p>`:`<div class="modal-actions"><button class="button danger" data-action="void-order" data-id="${esc(id)}">Buchung stornieren</button><button class="button" data-action="close-modal">Schließen</button></div>`}</div>`);
   }catch(error){toast(error.message,true);}
 }
 function voidForm(id) {
@@ -287,7 +310,7 @@ async function action(button) {
     case 'cart-remove':changeCart(id,0);break;
     case 'clear-cart':
       openModal(`${modalHead('Neue Runde?','Alle Artikel werden aus der aktuellen Bestellung entfernt.')}<div class="modal-body"><div class="modal-actions"><button class="button" data-action="close-modal">Behalten</button><button class="button gold" data-action="confirm-clear">Warenkorb leeren</button></div></div>`);break;
-    case 'confirm-clear':if(state.pending)return;state.cart=[];state.requestId=crypto.randomUUID();saveDraft();modal.close();renderCart();break;
+    case 'confirm-clear':if(state.pending||state.busy)return;state.cart=[];state.discountPercent=0;state.discountValid=true;state.requestId=crypto.randomUUID();saveDraft();modal.close();renderCart();break;
     case 'payment':if(state.pending||state.busy)return;state.payment=button.dataset.payment;saveDraft();renderCart();break;
     case 'checkout':await checkout();break;
     case 'show-cart':$('#receipt')?.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});break;

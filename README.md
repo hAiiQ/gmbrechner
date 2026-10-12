@@ -7,6 +7,7 @@ Eine responsive Kasse in Schwarz, Oliv und Gold, gestaltet mit eurem Emblem und 
 - Anmeldung mit Mitarbeitername und gemeinsamem Bar-Passwort; optional 30 Tage angemeldet bleiben. Derselbe Name wird unabhängig von Groß-/Kleinschreibung wiedererkannt.
 - Mitarbeiterliste mit frei wählbarer Rolle und Abteilung, Abmelden auf allen Geräten, Deaktivieren und Wiederaktivieren.
 - Artikelliste mit Kategorien und Suche, Mengenauswahl, Warenkorb und exakter Berechnung in Cent.
+- Rabatt von 0–100 % auf den ganzen Kassenzettel, mit Zwischensumme, Rabattbetrag und Endbetrag.
 - Verkauf buchen mit Kennzeichnung „Bar“ oder „Karte“. Die Seite erfasst die Zahlung; sie belastet keine Karte und verbindet kein Kartenterminal.
 - Umsatz pro Mitarbeiter, Gesamtumsatz, Tages-/Wochen-/Monatsübersicht und eigene Datumsfilter.
 - Buchungsdetails, meistverkaufte Artikel und CSV-Export aller Positionen im gewählten Zeitraum.
@@ -25,6 +26,16 @@ Die Kasse enthält **24 Artikel aus eurer Speise- und Shishakarte** mit den best
 Beim ersten Start mit dieser Version wird die Karte auch in bestehenden Datenbanken automatisch eingespielt. Alte Beispielartikel werden aus Kasse und Sortiment archiviert; selbst angelegte zusätzliche Artikel bleiben erhalten. Die Umstellung auf die echte Karte erfolgt einmalig. Weitere Starts oder Deployments überschreiben eure späteren Preisänderungen nicht.
 
 Neue Verkäufe werden nach dem Kartenimport in USD gebucht. Bestehende Buchungen behalten ihre ursprünglichen Artikel, Preise und Währungen. Falls noch Euro-Umsätze aus der vorherigen Version vorhanden sind, könnt ihr in „Umsätze“ zwischen Dollar und Euro wählen. Die Summen werden je Währung getrennt berechnet; es findet keine Währungsumrechnung statt. Nach dem ersten Verkauf lässt sich die Währung über „Sortiment“ nicht mehr ändern.
+
+## Rabatt im Kassenzettel
+
+In **Kasse → Aktuelle Bestellung → Rabatt** einen Prozentsatz von **0 bis 100 %** eingeben, bei Bedarf mit bis zu zwei Nachkommastellen. Zwischensumme, abgezogener Rabattbetrag und Endbetrag werden sofort angezeigt. Der Rabatt gilt für die ganze Bestellung. Der Rabattbetrag wird auf volle Cent gerundet und von der Zwischensumme abgezogen. Beispiel: 1.000 $ mit 20 % Rabatt ergeben 200 $ Rabatt und 800 $ Gesamtbetrag.
+
+Beim Buchen berechnet der Server den Rabatt aus den tatsächlichen Artikelpreisen. Umsatz pro Mitarbeiter, Gesamtumsatz, Finanzen und Bar-/Kartengeldbestände verwenden den Betrag nach Rabatt. Auch bei **100 %** wird die vollständige Menge aus dem Lager abgezogen, mit einem Endbetrag von **0 $**. Ein Storno gibt die Artikel zurück und korrigiert nur das tatsächlich gebuchte Geld.
+
+Der Rabatt bleibt zusammen mit dem Warenkorb beim Neuladen oder einer offenen Buchung gespeichert. Nach erfolgreichem Verkauf oder Leeren des Warenkorbs beginnt die nächste Bestellung wieder bei **0 %**. Während der Buchungsstatus offen ist, ist das Rabattfeld gesperrt. Bereits gespeicherte Verkäufe behalten ihren Rabatt; Altbuchungen haben 0 % und behalten ihre ursprünglichen Beträge. Weitere Deployments setzen keine Rabatte oder Umsätze zurück.
+
+Die **Buchungsdetails** zeigen Zwischensumme, Rabatt und Endbetrag. Im **CSV-Export** stehen die Positionssummen vor/nach Rabatt, der Positionsrabatt sowie Rabattprozentsatz, Rabatt der Buchung und tatsächlicher Buchungsbetrag. Die beiden Buchungsbeträge wiederholen sich je Artikelzeile und dürfen beim Summieren der CSV nicht mehrfach pro Buchung gezählt werden. Für Umsätze der Favoriten und CSV-Positionssummen wird der Rabatt anteilig auf die Artikel verteilt; Rundungscent werden so verteilt, dass alle Positionen exakt den Endbetrag ergeben.
 
 ## Anmeldung und Angemeldet bleiben
 
