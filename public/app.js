@@ -111,7 +111,7 @@ function renderLogin() {
 }
 
 function shell() {
-  $('#app').innerHTML=`<header class="app-header">${brand()}<nav class="nav" aria-label="Hauptnavigation">${[['kasse','register','Kasse'],['stats','chart','Umsätze'],['inventory','box','Lager'],['purchases','download','Einkauf'],['vip','wine','VIP'],['finance','coin','Finanzen'],['admin','edit','Sortiment']].map(([view,name,label])=>`<button data-action="navigate" data-view="${view}" class="${state.view===view?'active':''}" ${state.view===view?'aria-current="page"':''}>${icon(name)}${label}</button>`).join('')}</nav><div class="user-area"><div class="avatar">${esc(initials(state.employee.name))}</div><div><div class="user-name">${esc(state.employee.name)}</div><div class="user-role">Angemeldet · Mitarbeiter</div></div><button class="icon-button" data-action="logout" aria-label="Abmelden" title="Abmelden">${icon('logout')}</button></div></header><div id="operation-recovery"></div><main id="main" class="main"></main><footer class="app-footer"><span class="footer-mark">${icon('cocktail')}GENTLEMANS BAR · GRAPESEED</span><span>GUTE GESELLSCHAFT. KLARE ABRECHNUNG.</span></footer>`;
+  $('#app').innerHTML=`<header class="app-header">${brand()}<nav class="nav" aria-label="Hauptnavigation">${[['kasse','register','Kasse'],['stats','chart','Umsätze'],['inventory','box','Lager'],['purchases','download','Einkauf'],['vip','wine','VIP'],['finance','coin','Finanzen'],['wallet','register','Kassenstand'],['admin','edit','Sortiment']].map(([view,name,label])=>`<button data-action="navigate" data-view="${view}" class="${state.view===view?'active':''}" ${state.view===view?'aria-current="page"':''}>${icon(name)}${label}</button>`).join('')}</nav><div class="user-area"><div class="avatar">${esc(initials(state.employee.name))}</div><div><div class="user-name">${esc(state.employee.name)}</div><div class="user-role">Angemeldet · Mitarbeiter</div></div><button class="icon-button" data-action="logout" aria-label="Abmelden" title="Abmelden">${icon('logout')}</button></div></header><div id="operation-recovery"></div><main id="main" class="main"></main><footer class="app-footer"><span class="footer-mark">${icon('cocktail')}GENTLEMANS BAR · GRAPESEED</span><span>GUTE GESELLSCHAFT. KLARE ABRECHNUNG.</span></footer>`;
 }
 function pageHeading(title,subtitle,eyebrow='Hinter der Bar') {
   const formatted=new Intl.DateTimeFormat('de-DE',{timeZone:'Europe/Berlin',weekday:'long',day:'numeric',month:'long'}).format(new Date());
@@ -132,6 +132,7 @@ async function renderPage() {
   if(state.view==='vip')await renderVIP(epoch);
   if(state.view==='finance')await renderFinance(epoch);
   if(state.view==='purchases')await renderPurchases(epoch);
+  if(state.view==='wallet')await renderWallet(epoch);
 }
 function renderKasse() {
   $('#main').innerHTML=`${pageHeading('Die Kasse.','Alles im Glas. Alles im Blick.')}<div class="kasse-layout"><section class="catalog" aria-label="Artikel auswählen"><div class="quick-metrics"><div class="quick-metric"><div class="metric-label">${icon('chart')}Umsatz heute</div><strong id="today-total">—</strong></div><div class="quick-metric"><div class="metric-label">${icon('user')}Dein Umsatz heute</div><strong id="own-total">—</strong></div><div class="quick-metric"><div class="metric-label">${icon('receipt')}Verkäufe heute</div><strong id="today-count">—</strong></div></div><div id="stock-notice">${stockNotice()}</div><div class="catalog-header"><h2 class="section-title">Unsere Karte <span class="item-count">${state.products.length} Artikel</span></h2><div class="search">${icon('search')}<input id="article-search" type="search" placeholder="Artikel suchen …" aria-label="Artikel suchen" value="${esc(state.search)}"></div></div><div id="categories" class="categories" aria-label="Artikelkategorien"></div><div id="product-grid" class="product-grid"></div><p class="catalog-note">${icon('info')}Artikel auswählen, Menge angeben und zur Bestellung hinzufügen.</p></section><aside id="receipt" class="receipt" aria-label="Aktuelle Bestellung"></aside></div><div id="mobile-cart-bar" class="mobile-cart-bar"></div>`;
@@ -302,6 +303,8 @@ async function action(button) {
     case 'new-rental':rentalForm(button.dataset.space);break;
     case 'cancel-rental':reasonOperation('Vermietung stornieren',`/rentals/${encodeURIComponent(id)}/cancel`,'Nur diese Vermietung und ihre Mieteinnahme werden storniert. Andere Gäste bleiben gebucht.');break;
     case 'new-finance':financeForm(button.dataset.kind);break;
+    case 'wallet-transfer':walletForm('transfer',button.dataset.account);break;
+    case 'wallet-adjust':walletForm('adjustment',button.dataset.account);break;
     case 'void-finance':reasonOperation('Finanzbuchung stornieren',`/finance/${encodeURIComponent(id)}/void`,'Der Eintrag bleibt nachvollziehbar und wird aus den Summen herausgerechnet.');break;
     case 'resume-operation':resumeOperation();break;
     case 'buy-minus':changePurchase(id,n=>Math.max(0,n-1));break;
@@ -339,6 +342,7 @@ setInterval(async()=>{
       await renderPage();
       if($('#stock-search')){$('#stock-search').value=search;$('#only-low').checked=only;$('#stock-search').dispatchEvent(new Event('input'));}
     }
+    if(state.view==='wallet')await renderPage();
   }catch{}
 },30000);
 async function initialize() {

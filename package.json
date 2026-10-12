@@ -11,7 +11,7 @@
     "start": "node --env-file-if-exists=.env server.js",
     "dev": "node --env-file-if-exists=.env --watch server.js",
     "test": "node --test tests/*.test.js",
-    "check": "node --check server.js && node --check lib/operations.js && node --check lib/inventory.js && node --check lib/rentals.js && node --check lib/access.js && node --check lib/purchases.js && node --check public/app.js && node --check public/operations.js && node --check public/purchases.js"
+    "check": "node --check server.js && node --check lib/operations.js && node --check lib/inventory.js && node --check lib/rentals.js && node --check lib/access.js && node --check lib/purchases.js && node --check lib/wallet.js && node --check public/app.js && node --check public/operations.js && node --check public/purchases.js && node --check public/wallet.js"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",

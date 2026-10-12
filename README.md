@@ -15,6 +15,7 @@ Eine responsive Kasse in Schwarz, Oliv und Gold, gestaltet mit eurem Emblem und 
 - Lagerbestand mit Warnungen unter 30 Stück, automatischem Abzug bei Verkäufen, Rückgabe bei Storno und Bestandsänderungen mit Grund.
 - Separate VIP-Seite für VIP Lounge und Oberen Bereich mit Kundendaten, Mietzeitraum und automatischer Mieteinnahme.
 - Finanzen mit sonstigen Einnahmen, Ausgaben, Pflichtgrund, Stornos und Gesamtsaldo.
+- Kassenstand mit Bankguthaben, Übergangskonto, Bargeld pro Mitarbeiter, manuellen Anfangsbeständen und Bankeinzahlungen ohne zusätzlichen Umsatz.
 - Zentrale PostgreSQL-Datenbank auf Render für mehrere Geräte. Doppelte Buchungsanfragen werden abgefangen.
 - Ein lokal gespeicherter Warenkorb pro Mitarbeiter. Bei Verbindungsabbruch bleibt eine offene Buchung gesperrt, bis ihr ihren Status über „Buchung prüfen“ erneut prüft.
 
@@ -100,13 +101,13 @@ Neue Verkäufe buchen Bestand und Umsatz gemeinsam in einer Datenbanktransaktion
 
 ## Einkauf und Konto
 
-Unter **Einkauf** die Menge jedes eingekauften Artikels eingeben; 0 bedeutet nicht ausgewählt. Die Seite zeigt die Einkaufssumme und den voraussichtlichen Kontostand danach. Optional einen Lieferanten/Grund ergänzen und das Buchungsdatum festlegen. **Einkauf buchen** speichert in einer gemeinsamen Datenbanktransaktion:
+Unter **Einkauf** die Menge jedes eingekauften Artikels eingeben; 0 bedeutet nicht ausgewählt. Die Seite zeigt die Einkaufssumme und den voraussichtlichen Bankbestand danach. Optional einen Lieferanten/Grund ergänzen und das Buchungsdatum festlegen. **Einkauf buchen** speichert in einer gemeinsamen Datenbanktransaktion:
 
 1. Einkauf und Mengen mit den damaligen Einkaufspreisen,
 2. Zuwachs im Lager samt Bewegungsprotokoll,
 3. eine Ausgabe über den gesamten Einkaufspreis in Finanzen.
 
-Der Kontostand entspricht dem gesamten Dollar-Saldo: Kassenumsatz + Mieteinnahmen + sonstige Einnahmen − Ausgaben. Der Einkauf reduziert diesen Saldo. Bei mehr Ausgaben als Einnahmen kann er negativ werden. Den Einkauf nicht zusätzlich als manuelle Ausgabe erfassen.
+Ein Einkauf reduziert sowohl das Bankguthaben unter **Kassenstand** als auch den Dollar-Saldo der Buchungshistorie unter **Finanzen**. Bargeld beim Team und das Übergangskonto werden dabei nicht belastet. Bei mehr Ausgaben als Bankguthaben kann die Bank negativ werden. Den Einkauf nicht zusätzlich als manuelle Ausgabe erfassen.
 
 Die Einkaufspreise aus den Bildern und der Ergänzung werden einmalig eingespielt:
 
@@ -132,13 +133,23 @@ Im Buchungsfenster Name, optional Familie, Nummer, Beginn und Tarif angeben. Bei
 
 Die VIP-Seite zeigt Name, Familie, Nummer, Beginn, Ende, Preis, Mitarbeiter und Status. Suchbar und filterbar nach aktiv/geplant, beendet, storniert oder allen Vermietungen. **Mehrere Gäste können denselben Bereich im gleichen Zeitraum buchen**, sowohl die VIP Lounge als auch den Oberen Bereich. Auch beide Bereiche können gleichzeitig vermietet werden. Es gibt keine Sperre für überlappende Zeiträume. Jeden Gast separat über die jeweilige Schaltfläche buchen; jede Buchung erhält ihre eigene Mieteinnahme zum gewählten Tarif. **Beim Buchen wird die gesamte Miete als Einnahme am Buchungstag in Finanzen erfasst**; bei Bedarf erst nach dem Zahlungseingang buchen. Ein Storno mit Grund storniert nur die ausgewählte Vermietung und ihre verknüpfte Einnahme; die Buchungen anderer Gäste bleiben bestehen.
 
+## Kassenstand, Bargeld und Bankeinzahlungen
+
+Die neue Seite **Kassenstand** zeigt **Gesamtbestand = Bank + Übergangskonto + Bargeld beim Team**. Diese Geldbestände starten bei Einführung dieser Erweiterung einmalig bei **0 $**. Bestehende Umsätze, Vermietungen und Finanzbuchungen werden erhalten und nicht nachträglich in die neuen Bestände importiert. Unter **Bestand festlegen** die tatsächlichen Anfangsbestände für Bank, Übergangskonto und jeden Mitarbeiter eintragen; angegeben wird der neue Gesamtbetrag, nicht eine zusätzliche Einzahlung. Solche Korrekturen benötigen einen Grund und erzeugen keinen neuen Umsatz. Weitere Deployments oder Neustarts setzen die Bestände nicht zurück.
+
+Neue **Barverkäufe** liegen beim Mitarbeiter, der den Verkauf bucht. **Kartenzahlungen** landen im **Übergangskonto**. Über **Auf Bank einzahlen** kann das Bargeld eines Mitarbeiters vollständig oder teilweise als eingezahlt verbucht werden. Auch das Übergangskonto kann auf die Bank übertragen werden. Erst bestätigen, nachdem das Geld tatsächlich eingezahlt wurde. Die Umbuchung zieht den Betrag an der Quelle ab und erhöht die Bank um denselben Betrag; Gesamtbestand und Umsatz bleiben dabei gleich. Wer die Abgabe erfasst hat, wird protokolliert. Alle angemeldeten Mitarbeiter können diese Bestände verwalten.
+
+Bei **Vermietungen** und **sonstigen Einnahmen/Ausgaben** Bar, Karte/Übergangskonto oder Bank wählen. Bar-Einnahmen liegen beim buchenden Mitarbeiter; eine Bar-Ausgabe wird von dessen Bargeld abgezogen und braucht genügend vorhandenes Bargeld. **Einkäufe** belasten die Bank; die Einkaufsseite zeigt deshalb das Bankguthaben und den Bankbestand nach dem Einkauf. Ein Bankbestand kann durch Ausgaben negativ werden und anschließend über die Bestandskorrektur abgeglichen werden.
+
+Stornos korrigieren auch den Geldbestand. Ausgaben werden an ihrer ursprünglichen Geldquelle zurückgebucht. Bei Einnahmen wird zuerst der noch vorhandene Betrag an der ursprünglichen Quelle abgezogen; bereits eingezahltes Bargeld oder übertragene Kartenzahlungen werden über die Bank erstattet. Ein Storno von Altbuchungen vor Einführung der Geldbestände verändert ausschließlich die bisherige Umsatz-/Finanzhistorie. Doppelte Anfragen erzeugen keine zweite Einzahlung; bei zwischenzeitlich verändertem Bestand muss vor der Buchung aktualisiert werden. Offene Geldbuchungen werden bei Verbindungsfehlern über **Buchung prüfen** mit derselben Buchungsnummer wiederholt.
+
 ## Finanzen
 
 Unter **Finanzen** sonstige Einnahmen und Ausgaben in Dollar erfassen: positiver Betrag, Buchungsdatum und Grund sind Pflicht. Der Mitarbeiter wird aus der Anmeldung übernommen. Einträge bleiben bei Storno sichtbar, zählen aber nicht mehr zu den Summen. Mietbeträge werden automatisch erfasst und dürfen nicht zusätzlich als sonstige Einnahme gebucht werden.
 
-Die Übersicht zeigt Kassenumsatz, Vermietungen, sonstige Einnahmen, Ausgaben, gesamte Einnahmen und **Saldo = Kassenumsatz + Vermietungen + sonstige Einnahmen − Ausgaben**. Zeitraumfilter begrenzen Summen und Liste; Euro-Altumsätze werden nicht mit Dollarbeträgen vermischt. Das ist eine Einnahmen-/Ausgabenübersicht, keine automatische Gewinn- oder Steuerberechnung. Die letzten 200 Finanzbuchungen werden angezeigt. Vermietungen werden auf der VIP-Seite storniert.
+Die Übersicht zeigt Kassenumsatz, Vermietungen, sonstige Einnahmen, Ausgaben, gesamte Einnahmen und **Saldo = Kassenumsatz + Vermietungen + sonstige Einnahmen − Ausgaben**. Das ist die bisherige Buchungshistorie; den aktuellen Geldbestand mit euren manuell erfassten Anfangswerten findet ihr unter **Kassenstand**. Zeitraumfilter begrenzen Summen und Liste; Euro-Altumsätze werden nicht mit Dollarbeträgen vermischt. Das ist eine Einnahmen-/Ausgabenübersicht, keine automatische Gewinn- oder Steuerberechnung. Die letzten 200 Finanzbuchungen werden angezeigt. Vermietungen werden auf der VIP-Seite storniert.
 
-Offene Lager-/VIP-/Finanzanfragen bleiben bei Verbindungsfehlern mit derselben Buchungsnummer im Browser gespeichert. Über **Buchung prüfen** wird das Ergebnis sicher abgefragt, bevor eine neue Buchung erfasst werden kann.
+Offene Lager-/Einkaufs-/VIP-/Finanz-/Geldanfragen bleiben bei Verbindungsfehlern mit derselben Buchungsnummer im Browser gespeichert. Über **Buchung prüfen** wird das Ergebnis sicher abgefragt, bevor eine neue Buchung erfasst werden kann.
 
 ## Technik und Prüfung
 
