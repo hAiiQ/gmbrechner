@@ -6,6 +6,7 @@ Eine responsive Kasse in Schwarz, Oliv und Gold, gestaltet mit eurem Emblem und 
 
 - Anmeldung mit Mitarbeitername und gemeinsamem Bar-Passwort; optional 30 Tage angemeldet bleiben. Derselbe Name wird unabhängig von Groß-/Kleinschreibung wiedererkannt.
 - Mitarbeiterliste mit frei wählbarer Rolle und Abteilung, Rauswerfen aus der Liste, Wiederherstellen, Abmelden auf allen Geräten und Deaktivieren.
+- Events-Seite für Mitarbeiter: Termine mit Datum und Uhrzeit eintragen, bearbeiten und löschen; Beschreibung und Ende sind optional.
 - Artikelliste mit Kategorien und Suche, Mengenauswahl, Warenkorb und exakter Berechnung in Cent.
 - Rabatt von 0–100 % auf den ganzen Kassenzettel, mit Zwischensumme, Rabattbetrag und Endbetrag.
 - Verkauf buchen mit Kennzeichnung „Bar“ oder „Karte“. Die Seite erfasst die Zahlung; sie belastet keine Karte und verbindet kein Kartenterminal.
@@ -143,6 +144,14 @@ Die Einkaufspreise aus den Bildern und der Ergänzung werden einmalig eingespiel
 Einkaufspreise sind für jeden angemeldeten Mitarbeiter unter **Sortiment → Bearbeiten → Einkaufspreis ($)** änderbar. Bei neuen Artikeln ohne Einkaufspreis muss dieser zuerst ergänzt werden. Pausierte Artikel können eingekauft werden. Änderungen und weitere Deployments ändern weder historische Einkäufe noch Bestände oder Geldbeträge. Wiederholte Buchungsanfragen buchen die Mengen und Kosten nur einmal.
 
 Unter **Letzte Einkäufe → Details** einen Einkauf mit Grund stornieren. Das zieht die Menge wieder vom Lager ab und storniert die Ausgabe; beide Änderungen erfolgen gemeinsam. Bereits verbrauchter Bestand darf nicht negativ werden: das Storno wird abgelehnt, wenn die nötige Menge nicht mehr vorhanden ist. Einkaufs-Ausgaben lassen sich deshalb ausschließlich über den zugehörigen Einkauf stornieren. Bei Verbindungsproblemen den gespeicherten Status über **Buchung prüfen** klären.
+
+## Events fürs Team
+
+Unter **Events → Event eintragen** einen Eventnamen, Datum und Uhrzeit eingeben. **Infos für das Team** und ein Endzeitpunkt sind optional. Alle angemeldeten Mitarbeiter können die Termine sehen, bearbeiten und über **Details → Löschen** entfernen. Das Löschen benötigt eine Bestätigung. Eventzeiten gelten für **Europe/Berlin**; ungültige Daten und Uhrzeiten während der Zeitumstellung werden abgelehnt.
+
+Die Übersicht zeigt kommende und laufende Termine zuerst, mit Suche und Filtern für **Kommend & laufend**, **Alle Events** und **Vergangen**. Ohne Endzeitpunkt erscheint ein Termin ab seiner Startzeit unter „Vergangen“; mit Endzeitpunkt erscheint er dazwischen als „Läuft gerade“. Wer den Termin eingetragen und zuletzt bearbeitet hat, wird angezeigt. Die Seite aktualisiert sich alle 30 Sekunden, wenn kein Dialog geöffnet ist.
+
+Events werden zentral in PostgreSQL gespeichert und bleiben nach weiteren Deployments erhalten. Wiederholte Speicheranfragen erzeugen keinen zweiten Termin. Gleichzeitige Änderungen werden erkannt: vor erneutem Bearbeiten oder Löschen die aktuelle Liste laden. Eventplanung verändert keine Umsätze, Geldbestände, Lagerbestände oder VIP-Vermietungen.
 
 ## VIP und Vermietung
 
