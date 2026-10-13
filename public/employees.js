@@ -8,8 +8,9 @@ function updateEmployeeHeader(employee){
 async function renderEmployees(epoch){
   $('#main').innerHTML=`${pageHeading('Das Team.','Rollen vergeben, Abteilungen eintragen und Anmeldungen verwalten.','Mitarbeiter')}<div id="employees-content" class="table-empty">Mitarbeiter werden geladen …</div>`;
   try{
-    const {employees}=await api('/employees?include_removed=true');if(epoch!==state.epoch)return;
+    const {employees,jobs}=await api('/employees?include_removed=true');if(epoch!==state.epoch)return;
     state.employees=employees;
+    state.employeeJobs=jobs;
     const visible=employees.filter(e=>!e.removed_at),active=visible.filter(e=>e.active),signed=active.filter(e=>e.session_count>0);
     const content=$('#employees-content');content.className='';
     content.innerHTML=`<div class="stat-cards employee-metrics">${[['Im Team',active.length,'user','Aktive Mitarbeiter'],['Angemeldet',signed.length,'check','Mit mindestens einer gültigen Anmeldung'],['Deaktiviert',visible.length-active.length,'lock','Anmeldung mit diesem Namen gesperrt']].map(([label,value,i,hint])=>`<div class="stat-card"><div class="metric-label">${label}${icon(i)}</div><strong>${value}</strong><div class="helper">${hint}</div></div>`).join('')}</div><div class="toolbar employee-toolbar"><div class="search">${icon('search')}<input id="employee-search" type="search" aria-label="Mitarbeiter suchen" placeholder="Name, Rolle oder Abteilung suchen …" value="${esc(state.employeeSearch||'')}"></div><select id="employee-filter" aria-label="Mitarbeiter filtern">${[['all','Alle Mitarbeiter'],['active','Aktive Mitarbeiter'],['signed','Angemeldete Mitarbeiter'],['inactive','Deaktivierte Mitarbeiter'],['removed','Entfernte Mitarbeiter']].map(([value,label])=>`<option value="${value}" ${value===(state.employeeFilter||'all')?'selected':''}>${label}</option>`).join('')}</select><button class="button" data-action="refresh">${icon('clock')}Aktualisieren</button></div><section class="panel"><div class="panel-heading"><h2 id="employee-list-heading">Mitarbeiterliste</h2><span id="employee-count" class="eyebrow"></span></div><div id="employee-list" class="employee-list"></div></section><p class="employee-note helper">„Rauswerfen“ entfernt die Person aus der Mitarbeiterliste und sperrt ihre Anmeldung. Über den Filter „Entfernte Mitarbeiter“ kannst du sie wiederherstellen. „Deaktivieren“ sperrt die Anmeldung und behält die Person in der Liste. Umsätze, Buchungen und Bargeld bleiben erhalten.</p>`;
@@ -33,8 +34,13 @@ function renderEmployeeList(){
 }
 function employeeForm(id){
   const employee=state.employees?.find(e=>e.id===id);if(!employee)return;
-  const roles=[...new Set(['Inhaber','Manager','Barkeeper','Barkeeper Leitung','Security','Mitarbeiter',...state.employees.map(e=>e.role)])];
-  openModal(`${modalHead(employee.name,'Wähle eine Rolle oder trage eine eigene Bezeichnung ein.','Mitarbeiter bearbeiten')}<form class="modal-body" id="employee-form"><div class="field"><label for="employee-role">Rolle / Funktion</label><input id="employee-role" name="role" list="employee-roles" value="${esc(employee.role)}" maxlength="60" required><datalist id="employee-roles">${roles.map(role=>`<option value="${esc(role)}"></option>`).join('')}</datalist></div><div class="field"><label for="employee-department">Abteilung</label><input id="employee-department" name="department" value="${esc(employee.department)}" maxlength="80" placeholder="z. B. Bar, Küche, Shisha oder VIP-Service"><p class="helper">Frei eintragbar. Du kannst die Abteilung auch leer lassen.</p></div><p class="error" role="alert"></p><div class="modal-actions"><button class="button" type="button" data-action="close-modal">Abbrechen</button><button class="button gold" type="submit">${icon('check')}Speichern</button></div></form>`);
+  const roles=state.employeeJobs;
+  openModal(`${modalHead(employee.name,'Wähle einen festen Job und trage bei Bedarf eine Abteilung ein.','Mitarbeiter bearbeiten')}<form class="modal-body" id="employee-form"><div class="field"><label for="employee-role">Job</label><select id="employee-role" name="role" required><option value="" disabled ${roles.includes(employee.role)?'':'selected'}>Job auswählen</option>${roles.map(role=>`<option value="${esc(role)}" ${role===employee.role?'selected':''}>${esc(role)}</option>`).join('')}</select><p class="helper" id="employee-job-permissions"></p></div><div class="field"><label for="employee-department">Abteilung</label><input id="employee-department" name="department" value="${esc(employee.department)}" maxlength="80" placeholder="z. B. Bar, Küche, Shisha oder VIP-Service"><p class="helper">Frei eintragbar. Du kannst die Abteilung auch leer lassen.</p></div><p class="error" role="alert"></p><div class="modal-actions"><button class="button" type="button" data-action="close-modal">Abbrechen</button><button class="button gold" type="submit">${icon('check')}Speichern</button></div></form>`);
+  const hint=()=>{
+    const role=$('#employee-role').value;
+    $('#employee-job-permissions').textContent=['Inhaber','Manager'].includes(role)?'Vollzugriff auf alle Seiten und Funktionen.':['Security','Security Leitung'].includes(role)?'Zugriff auf Eintrittsbuchungen.':'Zugriff auf die Kasse.';
+  };
+  $('#employee-role').addEventListener('change',hint);hint();
   employeeSubmit($('#employee-form'),`/employees/${encodeURIComponent(id)}`,'PUT',form=>({role:form.elements.role.value,department:form.elements.department.value}),'Rolle und Abteilung gespeichert.');
 }
 function employeeAccessForm(kind,id){
@@ -52,7 +58,7 @@ function employeeSubmit(form,url,method,makeBody,message,selfKick=false){
   form.addEventListener('submit',async event=>{
     event.preventDefault();if(state.busy)return;
     const error=$('.error',form);error.textContent='';
-    const fields=[...form.querySelectorAll('button,input')];
+    const fields=[...form.querySelectorAll('button,input,select')];
     try{
       const body=makeBody(form);state.busy=true;fields.forEach(field=>field.disabled=true);
       const result=await api(url,{method,body});

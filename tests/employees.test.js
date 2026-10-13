@@ -34,10 +34,10 @@ test('Mitarbeiterverwaltung, Sitzungen und erhaltene Abrechnung',async t=>{
     assert.equal((await call('/orders/'+orderId)).status,200);
   }
   await t.test('Alle Mitarbeiter-Endpunkte benötigen Anmeldung; bestehende Namen erhalten sichere Vorgaben',async()=>{
-    for(const [path,body,method] of [['/employees',undefined,'GET'],['/employees/'+legacyId,{role:'Chef',department:'Bar'},'PUT'],['/employees/'+legacyId+'/sessions/end',{},'POST'],['/employees/'+legacyId+'/status',{active:false},'PUT']])assert.equal((await call(path,body,{cookie:null,method})).status,401);
+    for(const [path,body,method] of [['/employees',undefined,'GET'],['/employees/'+legacyId,{role:'Barkeeper',department:'Bar'},'PUT'],['/employees/'+legacyId+'/sessions/end',{},'POST'],['/employees/'+legacyId+'/status',{active:false},'PUT']])assert.equal((await call(path,body,{cookie:null,method})).status,401);
     const a=await login('Alice');alice=a.cookie;aliceId=a.data.employee.id;
     const old=(await list()).find(e=>e.id===legacyId);
-    assert.equal(old.role,'Mitarbeiter');assert.equal(old.department,'');assert.equal(old.active,true);assert.equal(old.last_login_at,null);assert.equal(old.session_count,0);
+    assert.equal(old.role,'Barkeeper');assert.equal(old.department,'');assert.equal(old.active,true);assert.equal(old.last_login_at,null);assert.equal(old.session_count,0);
   });
   await t.test('Jeder neue Name erscheint, mehrere Anmeldungen behalten dieselbe Person',async()=>{
     const b=await login('Bob');bob=b.cookie;bobId=b.data.employee.id;
@@ -50,12 +50,12 @@ test('Mitarbeiterverwaltung, Sitzungen und erhaltene Abrechnung',async t=>{
     }
     assert.equal((await bobEntry()).session_count,2);
   });
-  await t.test('Freie Rolle und Abteilung speichern, normalisieren und in der Anmeldung anzeigen',async()=>{
-    const result=await call('/employees/'+bobId,{role:'  Leitung   Shisha ',department:'Shisha & VIP-Service',active:false,name:'Falscher Name'},{method:'PUT'});
-    assert.equal(result.status,200);assert.equal(result.data.employee.role,'Leitung Shisha');assert.equal(result.data.employee.department,'Shisha & VIP-Service');assert.equal(result.data.employee.active,true);assert.equal(result.data.employee.name,'Bob');
-    const me=await call('/me',undefined,{cookie:bobSecond});assert.equal(me.data.employee.role,'Leitung Shisha');assert.equal(me.data.employee.department,'Shisha & VIP-Service');
+  await t.test('Voreingestellten Job und freie Abteilung speichern, normalisieren und in der Anmeldung anzeigen',async()=>{
+    const result=await call('/employees/'+bobId,{role:'  barkeeper   leitung ',department:'Shisha & VIP-Service',active:false,name:'Falscher Name'},{method:'PUT'});
+    assert.equal(result.status,200);assert.equal(result.data.employee.role,'Barkeeper Leitung');assert.equal(result.data.employee.department,'Shisha & VIP-Service');assert.equal(result.data.employee.active,true);assert.equal(result.data.employee.name,'Bob');
+    const me=await call('/me',undefined,{cookie:bobSecond});assert.equal(me.data.employee.role,'Barkeeper Leitung');assert.equal(me.data.employee.department,'Shisha & VIP-Service');
     assert.equal((await call('/employees/'+aliceId,{role:'Inhaber',department:''},{method:'PUT'})).status,200);
-    for(const body of [{role:'',department:''},{role:'x'.repeat(61),department:''},{role:'Chef',department:'x'.repeat(81)},{role:'Chef',department:2},{role:'Chef\u0000',department:''}])assert.equal((await call('/employees/'+bobId,body,{method:'PUT'})).status,400);
+    for(const body of [{role:'',department:''},{role:'x'.repeat(61),department:''},{role:'Barkeeper',department:'x'.repeat(81)},{role:'Barkeeper',department:2},{role:'Chef\u0000',department:''}])assert.equal((await call('/employees/'+bobId,body,{method:'PUT'})).status,400);
   });
   await t.test('Bargeld und Umsatz sind dauerhaft mit der ursprünglichen Person verbunden',async()=>{
     const products=await call('/products'),cola=products.data.products.find(p=>p.name==='Cola');orderId=randomUUID();
@@ -88,7 +88,7 @@ test('Mitarbeiterverwaltung, Sitzungen und erhaltene Abrechnung',async t=>{
     const result=await call('/employees/'+bobId+'/status',{active:true},{method:'PUT'});assert.equal(result.status,200);
     assert.equal((await call('/me',undefined,{cookie:bob})).status,401);
     const again=await login('Bob');assert.equal(again.status,200);bob=again.cookie;
-    assert.equal(again.data.employee.id,bobId);assert.equal(again.data.employee.role,'Leitung Shisha');assert.equal((await bobEntry()).deactivated_at,null);await unchangedMoney();
+    assert.equal(again.data.employee.id,bobId);assert.equal(again.data.employee.role,'Barkeeper Leitung');assert.equal((await bobEntry()).deactivated_at,null);await unchangedMoney();
   });
   await t.test('Gleichzeitige Anmeldung und Deaktivierung hinterlassen keine gültige Sitzung',async()=>{
     const results=await Promise.all([login('Bob'),call('/employees/'+bobId+'/status',{active:false},{method:'PUT'})]);
@@ -103,7 +103,7 @@ test('Mitarbeiterverwaltung, Sitzungen und erhaltene Abrechnung',async t=>{
   await t.test('Fehlerhafte Ziele/Status und eigene Deaktivierung werden abgewiesen; eigene Abmeldung möglich',async()=>{
     assert.equal((await call('/employees/not-an-id/sessions/end',{})).status,400);
     assert.equal((await call('/employees/'+randomUUID()+'/sessions/end',{})).status,404);
-    assert.equal((await call('/employees/'+randomUUID(),{role:'Chef',department:'Bar'},{method:'PUT'})).status,404);
+    assert.equal((await call('/employees/'+randomUUID(),{role:'Barkeeper',department:'Bar'},{method:'PUT'})).status,404);
     assert.equal((await call('/employees/'+randomUUID()+'/status',{active:true},{method:'PUT'})).status,404);
     assert.equal((await call('/employees/'+aliceId+'/status',{active:'false'},{method:'PUT'})).status,400);
     assert.equal((await call('/employees/'+aliceId+'/status',{active:false},{method:'PUT'})).status,409);

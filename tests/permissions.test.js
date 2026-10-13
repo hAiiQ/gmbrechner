@@ -28,7 +28,19 @@ test('Rollenrechte und Eintrittsbuchungen werden auf dem Server durchgesetzt',as
     const b=await role('Barkeeper Team','Barkeeper');bartender=b.cookie;bartenderId=b.data.employee.id;
     lead=(await role('Barleitung Team','Barkeeper Leitung')).cookie;
     const s=await role('Security Team','Security');guard=s.cookie;guardId=s.data.employee.id;
-    const s2=await role('Security Zwei','Security');otherGuard=s2.cookie;otherGuardId=s2.data.employee.id;
+    const s2=await role('Security Zwei','Security Leitung');otherGuard=s2.cookie;otherGuardId=s2.data.employee.id;
+  });
+  await t.test('Die Jobliste enthält genau sechs Vorgaben; andere Jobnamen werden abgelehnt',async()=>{
+    const jobs=['Inhaber','Manager','Barkeeper Leitung','Barkeeper','Security Leitung','Security'];
+    assert.deepEqual((await call('/employees')).data.jobs,jobs);
+    for(const value of ['Chef','Mitarbeiter','Service','Security-Leitung','Manager 2']){
+      assert.equal((await call('/employees/'+bartenderId,{role:value,department:'Bar'},{method:'PUT'})).status,400);
+    }
+    const normalized=await call('/employees/'+otherGuardId,{role:'  security   leitung  ',department:'Einlass frei eintragbar'},{method:'PUT'});
+    assert.equal(normalized.status,200);assert.equal(normalized.data.employee.role,'Security Leitung');
+    assert.equal(normalized.data.employee.department,'Einlass frei eintragbar');
+    const me=await call('/me',undefined,{cookie:otherGuard});
+    assert.deepEqual(me.data.employee.permissions,{manage:false,cashier:false,entrance:true});
   });
   await t.test('Inhaber und Manager erreichen alle Seiten und dürfen Rollen und Preise ändern',async()=>{
     for(const cookie of [owner,manager])for(const path of ['/stats','/inventory','/purchases','/rentals','/finance','/wallet','/employees','/events','/admissions','/products?all=true'])assert.equal((await call(path,undefined,{cookie})).status,200,path);
@@ -49,8 +61,10 @@ test('Rollenrechte und Eintrittsbuchungen werden auf dem Server durchgesetzt',as
     assert.equal((await call('/orders/'+sales.id+'/void',{reason:'Testverkauf'},{cookie:bartender})).status,200);
   });
   await t.test('Security hat ausschließlich Eintritt und lesbare Teamtermine, auch bei direkten API-Aufrufen',async()=>{
-    for(const path of ['/products','/cashier-summary','/stats','/inventory','/wallet','/finance','/employees','/purchases','/rentals'])assert.equal((await call(path,undefined,{cookie:guard})).status,403,path);
-    for(const path of ['/orders','/products','/finance','/wallet/transfer','/events'])assert.equal((await call(path,{}, {cookie:guard})).status,403,path);
+    for(const cookie of [guard,otherGuard]){
+      for(const path of ['/products','/cashier-summary','/stats','/inventory','/wallet','/finance','/employees','/purchases','/rentals'])assert.equal((await call(path,undefined,{cookie})).status,403,path);
+      for(const path of ['/orders','/products','/finance','/wallet/transfer','/events'])assert.equal((await call(path,{}, {cookie})).status,403,path);
+    }
     assert.equal((await call('/events',undefined,{cookie:guard})).status,200);
     assert.equal((await call('/admissions',undefined,{cookie:guard})).status,200);
     assert.equal((await call('/admissions',entry(),{cookie:null})).status,401);
@@ -116,4 +130,29 @@ test('Die Einführung weist einem bestehenden Michael Black einmalig die Inhaber
   assert.equal(Number((await db.query("SELECT balance_cents FROM wallet_accounts WHERE id='bank'")).rows[0].balance_cents),1250000);
   await db.query("UPDATE employees SET role='Manager' WHERE id=$1",[id]);await initializeDatabase(db);
   assert.equal((await db.query('SELECT role FROM employees WHERE id=$1',[id])).rows[0].role,'Manager');
+});
+
+test('Feste Jobs übernehmen alte Angaben einmalig und erhalten Abteilungen, Sperren und Geld',async t=>{
+  const db=await openDatabase({memory:true});t.after(()=>db.close());
+  await db.query(`CREATE TABLE employees(id TEXT PRIMARY KEY,name TEXT NOT NULL,name_key TEXT UNIQUE NOT NULL,
+    role TEXT NOT NULL DEFAULT 'Mitarbeiter',department TEXT NOT NULL DEFAULT '',active BOOLEAN NOT NULL DEFAULT TRUE);
+    CREATE TABLE wallet_accounts(id TEXT PRIMARY KEY,employee_id TEXT UNIQUE REFERENCES employees(id),balance_cents BIGINT NOT NULL DEFAULT 0);
+    INSERT INTO wallet_accounts(id,balance_cents) VALUES('bank',450000);`);
+  const rows=[['Michael Black','inhaber','Leitung',true],['Alte Funktion','Shisha Meister','Shisha',false],['Security Chef',' security   leitung ','Einlass',true],['Barchef',' barkeeper leitung ','Bar',true]];
+  const ids=rows.map(()=>randomUUID());
+  for(const [index,[name,role,department,active]] of rows.entries())await db.query('INSERT INTO employees(id,name,name_key,role,department,active) VALUES($1,$2,$3,$4,$5,$6)',[ids[index],name,name.toLowerCase(),role,department,active]);
+  await db.query('INSERT INTO wallet_accounts(id,employee_id,balance_cents) VALUES($1,$2,80000)',['employee:'+ids[1],ids[1]]);
+  await initializeDatabase(db);
+  const expected=['Inhaber','Barkeeper','Security Leitung','Barkeeper Leitung'];
+  for(const [index,id] of ids.entries()){
+    const employee=(await db.query('SELECT * FROM employees WHERE id=$1',[id])).rows[0];
+    assert.equal(employee.role,expected[index]);assert.equal(employee.department,rows[index][2]);assert.equal(employee.active,rows[index][3]);
+  }
+  const money=(await db.query('SELECT * FROM wallet_accounts ORDER BY id')).rows;
+  await db.query("UPDATE employees SET role='Security' WHERE id=$1",[ids[1]]);await initializeDatabase(db);
+  assert.equal((await db.query('SELECT role FROM employees WHERE id=$1',[ids[1]])).rows[0].role,'Security');
+  assert.deepEqual((await db.query('SELECT * FROM wallet_accounts ORDER BY id')).rows,money);
+  const newId=randomUUID();await db.query("INSERT INTO employees(id,name,name_key) VALUES($1,'Neuer Kollege','neuer kollege')",[newId]);
+  assert.equal((await db.query('SELECT role FROM employees WHERE id=$1',[newId])).rows[0].role,'Barkeeper');
+  assert.equal((await db.query("SELECT COUNT(*)::int AS count FROM schema_migrations WHERE id='fixed-employee-jobs-v1'")).rows[0].count,1);
 });

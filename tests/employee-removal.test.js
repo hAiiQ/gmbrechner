@@ -39,7 +39,7 @@ test('Rauswerfen entfernt Mitarbeiter aus der Liste und bewahrt ihre Abrechnung'
     assert.ok((await list()).every(e=>e.removed_at===null&&e.removed_by===null));
   });
   await t.test('Rolle, Umsätze, Lager und Bargeld werden für den Mitarbeiter erfasst',async()=>{
-    assert.equal((await call('/employees/'+bobId,{role:'Schichtleitung',department:'Bar & VIP'},{method:'PUT'})).status,200);
+    assert.equal((await call('/employees/'+bobId,{role:'Barkeeper Leitung',department:'Bar & VIP'},{method:'PUT'})).status,200);
     orderId=randomUUID();const cola=await product('cola');
     assert.equal((await call('/orders',{id:orderId,currency:'USD',payment:'cash',items:[{productId:cola.id,quantity:2,unitPriceCents:cola.price_cents}]},{cookie:bob})).status,201);
     originalMoney=await wallet();originalTotals=(await stats()).totals;originalStock=(await product('cola')).stock_quantity;
@@ -59,8 +59,8 @@ test('Rauswerfen entfernt Mitarbeiter aus der Liste und bewahrt ihre Abrechnung'
     assert.ok(!(await list()).some(e=>e.id===bobId));
     for(const cookie of [bob,bobSecond])assert.equal((await call('/me',undefined,{cookie})).status,401);
     for(const name of ['Bob','  BOB  ','Ｂｏｂ']){const rejected=await login(name);assert.equal(rejected.status,403);assert.equal(rejected.cookie,undefined);}
-    const removed=(await list(true)).find(e=>e.id===bobId);assert.equal(removed.session_count,0);assert.equal(removed.role,'Schichtleitung');assert.equal(removed.department,'Bar & VIP');assert.equal(removed.removed_by,aliceId);
-    assert.equal((await call('/employees/'+bobId,{role:'Chef',department:'Bar'},{method:'PUT'})).status,404);
+    const removed=(await list(true)).find(e=>e.id===bobId);assert.equal(removed.session_count,0);assert.equal(removed.role,'Barkeeper Leitung');assert.equal(removed.department,'Bar & VIP');assert.equal(removed.removed_by,aliceId);
+    assert.equal((await call('/employees/'+bobId,{role:'Barkeeper',department:'Bar'},{method:'PUT'})).status,404);
     assert.equal((await call('/employees/'+bobId+'/status',{active:true},{method:'PUT'})).status,409);
   });
   await t.test('Umsätze, Buchungsdetails und Geldbestände bleiben erhalten, Bargeldabgabe bleibt möglich',async()=>{
@@ -79,7 +79,7 @@ test('Rauswerfen entfernt Mitarbeiter aus der Liste und bewahrt ihre Abrechnung'
   });
   await t.test('Wiederherstellen bewahrt Mitarbeiter-ID, Rolle, Bargeld und Historie; alte Cookies bleiben ungültig',async()=>{
     const restored=await call('/employees/'+bobId+'/restore',{});assert.equal(restored.status,200);assert.equal(restored.data.employee.id,bobId);assert.equal(restored.data.employee.active,true);assert.equal(restored.data.employee.removed_at,null);
-    const visible=(await list()).find(e=>e.id===bobId);assert.equal(visible.role,'Schichtleitung');assert.equal(visible.department,'Bar & VIP');assert.equal(visible.removed_by,null);assert.equal(Number(visible.cash_cents),30000);assert.equal(visible.session_count,0);
+    const visible=(await list()).find(e=>e.id===bobId);assert.equal(visible.role,'Barkeeper Leitung');assert.equal(visible.department,'Bar & VIP');assert.equal(visible.removed_by,null);assert.equal(Number(visible.cash_cents),30000);assert.equal(visible.session_count,0);
     for(const cookie of [bob,bobSecond])assert.equal((await call('/me',undefined,{cookie})).status,401);
     const newLogin=await login('BOB');assert.equal(newLogin.status,200);assert.equal(newLogin.data.employee.id,bobId);bob=newLogin.cookie;
     assert.equal((await call('/employees/'+bobId+'/restore',{})).status,200);assert.equal((await call('/me',undefined,{cookie:bob})).status,200);

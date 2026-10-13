@@ -67,12 +67,13 @@ test('Speise- und Shishakarte: Erstinstallation, Migration und Historie',async t
   });
 
   await t.test('Neustarts bewahren manuelle Preisänderungen und pausierte Artikel',async()=>{
+    const migrations=(await db.query('SELECT id FROM schema_migrations ORDER BY id')).rows;
     await db.query("UPDATE products SET price_cents=42000 WHERE id='cola'");
     await db.query("UPDATE products SET active=FALSE WHERE id='magische-e-shisha'");
     await initializeDatabase(db);
     assert.equal((await db.query("SELECT price_cents FROM products WHERE id='cola'")).rows[0].price_cents,42000);
     assert.equal((await db.query("SELECT active FROM products WHERE id='magische-e-shisha'")).rows[0].active,false);
-    assert.equal((await db.query('SELECT COUNT(*)::int AS count FROM schema_migrations')).rows[0].count,3);
+    assert.deepEqual((await db.query('SELECT id FROM schema_migrations ORDER BY id')).rows,migrations);
     assert.equal((await db.query('SELECT COUNT(*)::int AS count FROM orders')).rows[0].count,2);
   });
 });
