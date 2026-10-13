@@ -50,6 +50,7 @@ test('Speise- und Shishakarte: Erstinstallation, Migration und Historie',async t
     try{
       const base=`http://127.0.0.1:${server.address().port}/api`;
       const login=await fetch(base+'/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Altbestand',password:'test-bar-access'})});
+      await db.query("UPDATE employees SET role='Manager' WHERE name_key='altbestand'");
       const headers={Cookie:login.headers.get('set-cookie').split(';')[0]};
       const usd=await (await fetch(base+'/stats',{headers})).json();
       const eur=await (await fetch(base+'/stats?currency=EUR',{headers})).json();

@@ -1,7 +1,9 @@
 function employeeRole(employee){return [employee.role||'Mitarbeiter',employee.department].filter(Boolean).join(' · ');}
 function updateEmployeeHeader(employee){
+  const changed=JSON.stringify(state.employee?.permissions)!==JSON.stringify(employee.permissions);
   state.employee=employee;
   const role=$('.user-role');if(role)role.textContent=employeeRole(employee);
+  if(changed&&employee.permissions)syncRoleNavigation();
 }
 async function renderEmployees(epoch){
   $('#main').innerHTML=`${pageHeading('Das Team.','Rollen vergeben, Abteilungen eintragen und Anmeldungen verwalten.','Mitarbeiter')}<div id="employees-content" class="table-empty">Mitarbeiter werden geladen …</div>`;
@@ -31,7 +33,7 @@ function renderEmployeeList(){
 }
 function employeeForm(id){
   const employee=state.employees?.find(e=>e.id===id);if(!employee)return;
-  const roles=[...new Set(['Mitarbeiter','Inhaber','Geschäftsleitung','Barkeeper','Service','Küche','Shisha',...state.employees.map(e=>e.role)])];
+  const roles=[...new Set(['Inhaber','Manager','Barkeeper','Barkeeper Leitung','Security','Mitarbeiter',...state.employees.map(e=>e.role)])];
   openModal(`${modalHead(employee.name,'Wähle eine Rolle oder trage eine eigene Bezeichnung ein.','Mitarbeiter bearbeiten')}<form class="modal-body" id="employee-form"><div class="field"><label for="employee-role">Rolle / Funktion</label><input id="employee-role" name="role" list="employee-roles" value="${esc(employee.role)}" maxlength="60" required><datalist id="employee-roles">${roles.map(role=>`<option value="${esc(role)}"></option>`).join('')}</datalist></div><div class="field"><label for="employee-department">Abteilung</label><input id="employee-department" name="department" value="${esc(employee.department)}" maxlength="80" placeholder="z. B. Bar, Küche, Shisha oder VIP-Service"><p class="helper">Frei eintragbar. Du kannst die Abteilung auch leer lassen.</p></div><p class="error" role="alert"></p><div class="modal-actions"><button class="button" type="button" data-action="close-modal">Abbrechen</button><button class="button gold" type="submit">${icon('check')}Speichern</button></div></form>`);
   employeeSubmit($('#employee-form'),`/employees/${encodeURIComponent(id)}`,'PUT',form=>({role:form.elements.role.value,department:form.elements.department.value}),'Rolle und Abteilung gespeichert.');
 }
@@ -54,7 +56,7 @@ function employeeSubmit(form,url,method,makeBody,message,selfKick=false){
     try{
       const body=makeBody(form);state.busy=true;fields.forEach(field=>field.disabled=true);
       const result=await api(url,{method,body});
-      if(result.employee?.id===state.employee?.id)updateEmployeeHeader(result.employee);
+      if(result.employee?.id===state.employee?.id)updateEmployeeHeader((await api('/me')).employee);
       modal.close();toast(message);
       if(selfKick){saveDraft();state.employee=null;state.epoch++;renderLogin();return;}
       await renderPage();

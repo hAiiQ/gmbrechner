@@ -1,3 +1,4 @@
+import {grantTestManager} from './fixtures.js';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID,randomBytes,createHash} from 'node:crypto';
@@ -18,7 +19,9 @@ test('Mitarbeiterverwaltung, Sitzungen und erhaltene Abrechnung',async t=>{
   let alice,bob,bobSecond,aliceId,bobId,orderId,previousTotals;
   async function call(path,body,{cookie=alice,method=body?'POST':'GET'}={}){
     const response=await fetch(base+path,{method,headers:{...(cookie?{Cookie:cookie}:{}),...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined});
-    return {status:response.status,data:await response.json(),cookie:response.headers.get('set-cookie')?.split(';')[0]};
+    const result={status:response.status,data:await response.json(),cookie:response.headers.get('set-cookie')?.split(';')[0]};
+    if(path==='/login'&&body?.name?.trim().toLowerCase()==='alice')await grantTestManager(db,result);
+    return result;
   }
   const login=(name)=>call('/login',{name,password:'employee-test-access',remember_me:true});
   const list=async()=>{const result=await call('/employees');assert.equal(result.status,200);return result.data.employees;};

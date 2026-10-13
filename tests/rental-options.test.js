@@ -1,3 +1,4 @@
+import {grantTestManager} from './fixtures.js';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
@@ -12,7 +13,9 @@ test('Kostenlose und unbegrenzte Vermietungen sind unabhängige Optionen',async 
   const base=`http://127.0.0.1:${server.address().port}/api`;let cookie,otherCookie,legacy;
   async function call(path,body,{session=cookie}={}){
     const response=await fetch(base+path,{method:body?'POST':'GET',headers:{...(session?{Cookie:session}:{}),...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined});
-    return {status:response.status,data:await response.json(),cookie:response.headers.get('set-cookie')?.split(';')[0]};
+    const result={status:response.status,data:await response.json(),cookie:response.headers.get('set-cookie')?.split(';')[0]};
+    if(path==='/login')await grantTestManager(db,result);
+    return result;
   }
   const body=(space,free=false,unlimited=false)=>({id:randomUUID(),space,free,unlimited,unit:space==='vip'?'hour':'week',quantity:2,start:'2026-01-01T18:00',customer_name:'Testgast '+space,family:'Testfamilie',phone:'555-0100',payment:'cash'});
   const wallet=async()=>(await call('/wallet')).data;

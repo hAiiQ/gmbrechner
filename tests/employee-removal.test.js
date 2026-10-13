@@ -1,3 +1,4 @@
+import {grantTestManager} from './fixtures.js';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
@@ -13,7 +14,9 @@ test('Rauswerfen entfernt Mitarbeiter aus der Liste und bewahrt ihre Abrechnung'
   let alice,aliceId,bob,bobSecond,bobId,offlineId,inactiveId,orderId,originalMoney,originalTotals,originalStock;
   async function call(path,body,{cookie=alice,method=body?'POST':'GET'}={}){
     const response=await fetch(base+path,{method,headers:{...(cookie?{Cookie:cookie}:{}),...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined});
-    return {status:response.status,data:await response.json(),cookie:response.headers.get('set-cookie')?.split(';')[0]};
+    const result={status:response.status,data:await response.json(),cookie:response.headers.get('set-cookie')?.split(';')[0]};
+    if(path==='/login'&&body?.name?.trim().toLowerCase()==='alice')await grantTestManager(db,result);
+    return result;
   }
   const login=name=>call('/login',{name,password:'employee-removal-test'});
   const list=async(includeRemoved=false)=>{const r=await call('/employees'+(includeRemoved?'?include_removed=true':''));assert.equal(r.status,200);return r.data.employees;};

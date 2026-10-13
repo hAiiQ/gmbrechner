@@ -102,6 +102,23 @@ dialog{border:1px solid #474633;border-radius:12px;max-width:460px;width:calc(10
 @media(max-width:400px){.rental-options{grid-template-columns:1fr}}
 
 /* Events for the team */
+.admission-layout{display:grid;grid-template-columns:310px minmax(0,1fr);gap:24px;align-items:start}
+.admission-form-panel .panel-heading .icon{color:var(--gold)}
+.admission-total{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding:22px 0 5px;font-size:12px}
+.admission-total strong{font-size:28px;color:var(--gold);font-weight:400}
+.admission-form-panel form>.button{margin-top:22px}
+.admission-summary{display:flex;gap:35px;padding:24px;border-bottom:1px solid var(--line)}
+.admission-summary span{display:block;font-size:10px;color:var(--muted)}
+.admission-summary strong{display:block;font-weight:400;font-size:26px;color:var(--gold);margin-top:12px}
+.team-event-notice{margin-bottom:23px;border:1px solid #5c5030;background:#262318;border-radius:8px;font-size:12px}
+.team-event-notice summary{display:flex;align-items:center;gap:10px;cursor:pointer;padding:17px 20px;color:var(--gold)}
+.team-event-notice summary span{margin-left:auto;font-size:10px}
+.team-event-notice>div{padding:0 20px 18px}
+.team-event-notice article+article{margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+.team-event-notice article strong{display:block;font-family:var(--serif);font-size:18px;color:var(--cream)}
+.team-event-notice article span{display:block;margin-top:7px;font-size:11px;color:var(--gold)}
+.team-event-notice article p{color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7;margin-top:10px}
+@media(max-width:850px){.admission-layout{grid-template-columns:1fr}.admission-form-panel{max-width:500px;width:100%}}
 .event-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}
 .event-filters,.event-toolbar-actions{display:flex;gap:12px;align-items:center}
 .event-filters select{width:185px;font-size:11px;min-height:39px;padding:9px 12px}

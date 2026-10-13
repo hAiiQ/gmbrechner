@@ -1,3 +1,4 @@
+import {grantTestManager} from './fixtures.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -21,7 +22,7 @@ test('Kasse: Integration mit echter PostgreSQL-Engine', async t => {
     const data=type.includes('json')?await res.json():await res.text();
     return {status:res.status,data,cookie:res.headers.get('set-cookie')?.split(';')[0],headers:res.headers};
   }
-  const login=async name=>request('/login',{method:'POST',body:{name,password:'test-bar-access'}});
+  const login=async name=>grantTestManager(db,await request('/login',{method:'POST',body:{name,password:'test-bar-access'}}));
   let alice,bob,aliceId,firstOrder,secondOrder;
   const sale=(items,extra={})=>({id:randomUUID(),payment:'cash',currency:'USD',items:items.map(([productId,quantity,unitPriceCents])=>({productId,quantity,unitPriceCents})),...extra});
 
@@ -41,7 +42,7 @@ test('Kasse: Integration mit echter PostgreSQL-Engine', async t => {
     assert.equal(same.data.employee.name,'Alice');
     assert.equal((await db.query('SELECT COUNT(*)::int AS count FROM employees')).rows[0].count,2);
   });
-  await t.test('Jeder angemeldete Mitarbeiter kann Artikel und Preise ohne PIN ändern',async()=>{
+  await t.test('Manager können Artikel und Preise ohne PIN ändern',async()=>{
     const added=await request('/products',{method:'POST',cookie:bob,body:{name:'Testartikel',category:'Snacks',description:'Test',price_cents:111}});
     assert.equal(added.status,201);
     const changed=await request(`/products/${added.data.product.id}`,{method:'PUT',cookie:alice,body:{name:'Testartikel',category:'Snacks',description:'Test',price_cents:125,active:false}});

@@ -1,3 +1,4 @@
+import {grantTestManager} from './fixtures.js';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
@@ -12,7 +13,9 @@ test('Rabatte auf Kassenzettel, Umsatz, Lager und Geldbestand',async t=>{
   const base=`http://127.0.0.1:${server.address().port}/api`;let alice,bob,aliceId,cardOrder;
   async function call(path,body,{cookie=alice,method=body?'POST':'GET'}={}){
     const r=await fetch(base+path,{method,headers:{...(cookie?{Cookie:cookie}:{}),...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined});
-    return {status:r.status,data:r.headers.get('content-type').includes('application/json')?await r.json():await r.text(),cookie:r.headers.get('set-cookie')?.split(';')[0]};
+    const result={status:r.status,data:r.headers.get('content-type').includes('application/json')?await r.json():await r.text(),cookie:r.headers.get('set-cookie')?.split(';')[0]};
+    if(path==='/login')await grantTestManager(db,result);
+    return result;
   }
   const sale=(percent=0,items=[['cola',1,30000]],payment='cash')=>({id:randomUUID(),currency:'USD',payment,discount_percent:percent,items:items.map(([productId,quantity,unitPriceCents])=>({productId,quantity,unitPriceCents}))});
   const stats=async()=>(await call('/stats')).data;

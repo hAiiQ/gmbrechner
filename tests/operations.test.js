@@ -1,3 +1,4 @@
+import {grantTestManager} from './fixtures.js';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
@@ -13,7 +14,9 @@ test('Lager, Vermietungen und Finanzen mit echter Datenbank',async t=>{
   let cookie;
   async function call(path,body,method=body?'POST':'GET'){
     const res=await fetch(base+path,{method,headers:{...(cookie?{Cookie:cookie}:{}),...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined});
-    return {status:res.status,data:await res.json(),cookie:res.headers.get('set-cookie')?.split(';')[0]};
+    const result={status:res.status,data:await res.json(),cookie:res.headers.get('set-cookie')?.split(';')[0]};
+    if(path==='/login')await grantTestManager(db,result);
+    return result;
   }
   const product=async id=>(await db.query('SELECT * FROM products WHERE id=$1',[id])).rows[0];
   const sale=(id,quantity,price,requestId=randomUUID())=>({id:requestId,payment:'cash',currency:'USD',items:[{productId:id,quantity,unitPriceCents:price}]});

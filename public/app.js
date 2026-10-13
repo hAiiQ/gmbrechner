@@ -1,6 +1,7 @@
 const $ = (selector, root = document) => root.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const drawings = {
+  ticket:'<path d="M3 6h18v4a2 2 0 0 0 0 4v4H3v-4a2 2 0 0 0 0-4V6ZM15 6v3M15 11v2M15 15v3"/>',
   calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18M7 14h.01M12 14h.01M17 14h.01M7 18h.01M12 18h.01"/>',
   register:'<rect x="3" y="10" width="18" height="11" rx="2"/><path d="M6 10V4h12v6M7 15h.01M11 15h.01M7 18h.01M11 18h.01M16 14h2v4h-2M8 7h8"/>',
   chart:'<path d="M4 3v18h17M8 16v-4M13 16V8M18 16V5"/>',
@@ -75,6 +76,7 @@ async function api(url,{method='GET',body}={}) {
   catch { connection(false); const error=new Error('Keine Verbindung. Bitte prüfe dein Internet und versuche es erneut.');error.status=0;throw error; }
   const data=await response.json().catch(()=>({error:'Der Server ist gerade nicht erreichbar.'}));
   if(!response.ok){
+    if(data.code==='ROLE_FORBIDDEN'&&data.employee)updateEmployeeHeader(data.employee);
     const error=new Error(data.error||'Die Anfrage ist fehlgeschlagen.');error.status=response.status;
     if(response.status===401 && url!=='/login' && state.employee){
       saveDraft();state.employee=null;if(modal.open)modal.close();renderLogin();
@@ -88,6 +90,7 @@ function saveDraft() {
   try {localStorage.setItem(`gentlemans-cart-${state.employee.id}`,JSON.stringify({cart:state.cart,payment:state.payment,discountPercent:state.discountPercent,requestId:state.requestId,pending:state.pending,operationPending:state.operationPending,purchaseCart:state.purchaseCart}));} catch {/* Die zentrale Buchung bleibt unabhängig vom lokalen Warenkorb. */}
 }
 function restoreDraft() {
+  state.admissionDraft=null;
   state.cart=[];state.purchaseCart=[];state.payment='cash';state.discountPercent=0;state.discountValid=true;state.requestId=crypto.randomUUID();state.pending=null;state.operationPending=null;state.lastOrder=null;
   try {
     const saved=JSON.parse(localStorage.getItem(`gentlemans-cart-${state.employee.id}`)||'null');
@@ -112,18 +115,19 @@ function renderLogin() {
 }
 
 function shell() {
-  $('#app').innerHTML=`<header class="app-header">${brand()}<nav class="nav" aria-label="Hauptnavigation">${[['kasse','register','Kasse'],['stats','chart','Umsätze'],['inventory','box','Lager'],['purchases','download','Einkauf'],['vip','wine','VIP'],['events','calendar','Events'],['finance','coin','Finanzen'],['wallet','register','Kassenstand'],['employees','user','Mitarbeiter'],['admin','edit','Sortiment']].map(([view,name,label])=>`<button data-action="navigate" data-view="${view}" class="${state.view===view?'active':''}" ${state.view===view?'aria-current="page"':''}>${icon(name)}${label}</button>`).join('')}</nav><div class="user-area"><div class="avatar">${esc(initials(state.employee.name))}</div><div><div class="user-name">${esc(state.employee.name)}</div><div class="user-role">${esc(employeeRole(state.employee))}</div></div><button class="icon-button" data-action="logout" aria-label="Abmelden" title="Abmelden">${icon('logout')}</button></div></header><div id="operation-recovery"></div><main id="main" class="main"></main><footer class="app-footer"><span class="footer-mark">${icon('cocktail')}GENTLEMANS BAR · GRAPESEED</span><span>GUTE GESELLSCHAFT. KLARE ABRECHNUNG.</span></footer>`;
+  $('#app').innerHTML=`<header class="app-header">${brand()}<nav class="nav" aria-label="Hauptnavigation">${navigationMarkup()}</nav><div class="user-area"><div class="avatar">${esc(initials(state.employee.name))}</div><div><div class="user-name">${esc(state.employee.name)}</div><div class="user-role">${esc(employeeRole(state.employee))}</div></div><button class="icon-button" data-action="logout" aria-label="Abmelden" title="Abmelden">${icon('logout')}</button></div></header><div id="operation-recovery"></div><main id="main" class="main"></main><footer class="app-footer"><span class="footer-mark">${icon('cocktail')}GENTLEMANS BAR · GRAPESEED</span><span>GUTE GESELLSCHAFT. KLARE ABRECHNUNG.</span></footer>`;
 }
 function pageHeading(title,subtitle,eyebrow='Hinter der Bar') {
   const formatted=new Intl.DateTimeFormat('de-DE',{timeZone:'Europe/Berlin',weekday:'long',day:'numeric',month:'long'}).format(new Date());
   return `<div class="page-heading"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1><p>${subtitle}</p></div><div class="date-status">${esc(formatted)}<div id="connection" class="connection${state.connected?'':' offline'}"><span class="status-dot"></span>${state.connected?'Zentral verbunden':'Verbindung unterbrochen'}</div></div></div>`;
 }
 async function startApp() {
-  try{const result=await api('/products');state.products=result.products;shell();recoveryNotice();await renderPage();}
+  try{state.view=allowedView(state.view)?state.view:homeView();state.products=can('cashier')?(await api('/products')).products:[];shell();recoveryNotice();await renderPage();}
   catch(error){if(state.employee){shell();$('#main').innerHTML=`<div class="empty-state">${icon('info')}<h3>Die Kasse wartet kurz.</h3><p>${esc(error.message)}</p><br><button class="button gold" data-action="reload">Erneut verbinden</button></div>`;}}
 }
 async function renderPage() {
   if(!state.employee)return;
+  if(!allowedView(state.view))state.view=homeView();
   const epoch=++state.epoch;
   document.querySelectorAll('.nav button').forEach(b=>{b.classList.toggle('active',b.dataset.view===state.view);if(b.dataset.view===state.view)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
   if(state.view==='kasse'){renderKasse();refreshMetrics().catch(()=>{});}
@@ -136,10 +140,11 @@ async function renderPage() {
   if(state.view==='wallet')await renderWallet(epoch);
   if(state.view==='employees')await renderEmployees(epoch);
   if(state.view==='events')await renderEvents(epoch);
+  if(state.view==='entrance')await renderAdmissions(epoch);
 }
 function renderKasse() {
-  $('#main').innerHTML=`${pageHeading('Die Kasse.','Alles im Glas. Alles im Blick.')}<div class="kasse-layout"><section class="catalog" aria-label="Artikel auswählen"><div class="quick-metrics"><div class="quick-metric"><div class="metric-label">${icon('chart')}Umsatz heute</div><strong id="today-total">—</strong></div><div class="quick-metric"><div class="metric-label">${icon('user')}Dein Umsatz heute</div><strong id="own-total">—</strong></div><div class="quick-metric"><div class="metric-label">${icon('receipt')}Verkäufe heute</div><strong id="today-count">—</strong></div></div><div id="stock-notice">${stockNotice()}</div><div class="catalog-header"><h2 class="section-title">Unsere Karte <span class="item-count">${state.products.length} Artikel</span></h2><div class="search">${icon('search')}<input id="article-search" type="search" placeholder="Artikel suchen …" aria-label="Artikel suchen" value="${esc(state.search)}"></div></div><div id="categories" class="categories" aria-label="Artikelkategorien"></div><div id="product-grid" class="product-grid"></div><p class="catalog-note">${icon('info')}Artikel auswählen, Menge angeben und zur Bestellung hinzufügen.</p></section><aside id="receipt" class="receipt" aria-label="Aktuelle Bestellung"></aside></div><div id="mobile-cart-bar" class="mobile-cart-bar"></div>`;
-  renderCategories();renderProducts();renderCart();
+  $('#main').innerHTML=`${pageHeading('Die Kasse.','Alles im Glas. Alles im Blick.')}<div id="team-event-notice"></div><div class="kasse-layout"><section class="catalog" aria-label="Artikel auswählen"><div class="quick-metrics"><div class="quick-metric"><div class="metric-label">${icon('chart')}Umsatz heute</div><strong id="today-total">—</strong></div><div class="quick-metric"><div class="metric-label">${icon('user')}Dein Umsatz heute</div><strong id="own-total">—</strong></div><div class="quick-metric"><div class="metric-label">${icon('receipt')}Verkäufe heute</div><strong id="today-count">—</strong></div></div><div id="stock-notice">${stockNotice()}</div><div class="catalog-header"><h2 class="section-title">Unsere Karte <span class="item-count">${state.products.length} Artikel</span></h2><div class="search">${icon('search')}<input id="article-search" type="search" placeholder="Artikel suchen …" aria-label="Artikel suchen" value="${esc(state.search)}"></div></div><div id="categories" class="categories" aria-label="Artikelkategorien"></div><div id="product-grid" class="product-grid"></div><p class="catalog-note">${icon('info')}Artikel auswählen, Menge angeben und zur Bestellung hinzufügen.</p></section><aside id="receipt" class="receipt" aria-label="Aktuelle Bestellung"></aside></div><div id="mobile-cart-bar" class="mobile-cart-bar"></div>`;
+  renderCategories();renderProducts();renderCart();renderTeamEventNotice();
   $('#article-search').addEventListener('input',event=>{state.search=event.target.value;renderProducts();});
 }
 function renderCategories() {
@@ -181,8 +186,9 @@ function renderCart() {
   updateCartTotals();
 }
 async function refreshMetrics() {
-  const d=today();const result=await api(`/stats?from=${d}&to=${d}`);
-  if($('#today-total')){$('#today-total').textContent=money(result.totals.total_cents,result.currency);$('#today-count').textContent=result.totals.count;$('#own-total').textContent=money(result.employees.find(e=>e.id===state.employee?.id)?.total_cents||0,result.currency);}
+  if(!can('cashier'))return;
+  const result=await api('/cashier-summary');
+  if($('#today-total')){$('#today-total').textContent=money(result.total_cents);$('#today-count').textContent=result.count;$('#own-total').textContent=money(result.own_total_cents);}
 }
 function openModal(content) {
   modal.innerHTML=content;if(!modal.open)modal.showModal();
@@ -331,6 +337,7 @@ async function action(button) {
     case 'edit-event':eventForm(id);break;
     case 'event-details':eventDetails(id);break;
     case 'delete-event':deleteEventForm(id);break;
+    case 'void-admission':reasonOperation('Eintritt stornieren',`/admissions/${encodeURIComponent(id)}/void`,'Die Eintrittseinnahme und der zugehörige Geldbestand werden korrigiert.');break;
     case 'cancel-rental':reasonOperation('Vermietung stornieren',`/rentals/${encodeURIComponent(id)}/cancel`,'Nur diese Vermietung und ihre Mieteinnahme werden storniert. Andere Gäste bleiben gebucht.');break;
     case 'new-finance':financeForm(button.dataset.kind);break;
     case 'wallet-transfer':walletForm('transfer',button.dataset.account);break;
@@ -365,6 +372,7 @@ setInterval(async()=>{
   try{
     const me=await api('/me');updateEmployeeHeader(me.employee);
     if(modal.open)return;
+    if(!can('cashier')){if(state.view==='entrance')await renderPage();return;}
     const {products}=await api('/products');
     const newlyLow=products.filter(p=>p.stock_quantity<30&&state.products.find(old=>old.id===p.id)?.stock_quantity>=30);
     const changed=JSON.stringify(products)!==JSON.stringify(state.products);
@@ -379,7 +387,7 @@ setInterval(async()=>{
       await renderPage();
       if($('#stock-search')){$('#stock-search').value=search;$('#only-low').checked=only;$('#stock-search').dispatchEvent(new Event('input'));}
     }
-    if(state.view==='wallet'||state.view==='employees'||state.view==='events')await renderPage();
+    if(state.view==='wallet'||state.view==='employees'||state.view==='events'||state.view==='entrance')await renderPage();
   }catch{}
 },30000);
 async function initialize() {

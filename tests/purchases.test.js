@@ -1,3 +1,4 @@
+import {grantTestManager} from './fixtures.js';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
@@ -11,7 +12,9 @@ test('Einkauf verbindet Lager und Konto atomar',async t=>{
   const base=`http://127.0.0.1:${server.address().port}/api`;let cookie,otherCookie,first,custom;
   async function call(path,body,method=body?'POST':'GET',session=cookie){
     const r=await fetch(base+path,{method,headers:{...(session?{Cookie:session}:{}),...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined});
-    return {status:r.status,data:await r.json(),cookie:r.headers.get('set-cookie')?.split(';')[0]};
+    const result={status:r.status,data:await r.json(),cookie:r.headers.get('set-cookie')?.split(';')[0]};
+    if(path==='/login')await grantTestManager(db,result);
+    return result;
   }
   const buy=(lines,more={})=>({id:randomUUID(),occurred_on:'2026-10-12',reason:'Warenlieferung',items:lines.map(([productId,quantity,unitCostCents])=>({productId,quantity,unitCostCents})),...more});
   const stock=async id=>(await db.query('SELECT stock_quantity FROM products WHERE id=$1',[id])).rows[0].stock_quantity;

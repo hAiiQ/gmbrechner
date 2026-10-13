@@ -1,3 +1,4 @@
+import {grantTestManager} from './fixtures.js';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
@@ -12,7 +13,9 @@ test('Mehrere Gäste können denselben Bereich gleichzeitig mieten',async t=>{
   const base=`http://127.0.0.1:${server.address().port}/api`;let cookie;
   async function call(path,body){
     const r=await fetch(base+path,{method:body?'POST':'GET',headers:{...(body?{'Content-Type':'application/json'}:{}),...(cookie?{Cookie:cookie}:{})},body:body?JSON.stringify(body):undefined});
-    return {status:r.status,data:await r.json(),cookie:r.headers.get('set-cookie')?.split(';')[0]};
+    const result={status:r.status,data:await r.json(),cookie:r.headers.get('set-cookie')?.split(';')[0]};
+    if(path==='/login')await grantTestManager(db,result);
+    return result;
   }
   cookie=(await call('/login',{name:'Vermietung Team',password:'test-rental-access'})).cookie;
   const rental=(space,start,customer_name=space==='vip'?'VIP Gast':'Gast oben')=>({id:randomUUID(),space,start,unit:space==='vip'?'hour':'week',quantity:2,customer_name,phone:'555-0100'});

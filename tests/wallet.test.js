@@ -1,3 +1,4 @@
+import {grantTestManager} from './fixtures.js';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
@@ -12,7 +13,9 @@ test('Kassenstand, Übergangskonto und Bargeldabgabe mit echten Transaktionen',a
   const base=`http://127.0.0.1:${server.address().port}/api`;let alice,bob,aliceId,bobId,cashSale,cardSale,rentalId,cashExpense,purchaseId;
   async function call(path,body,{cookie=alice,method=body?'POST':'GET'}={}){
     const r=await fetch(base+path,{method,headers:{...(cookie?{Cookie:cookie}:{}),...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined});
-    return {status:r.status,data:await r.json(),cookie:r.headers.get('set-cookie')?.split(';')[0]};
+    const result={status:r.status,data:await r.json(),cookie:r.headers.get('set-cookie')?.split(';')[0]};
+    if(path==='/login')await grantTestManager(db,result);
+    return result;
   }
   async function wallet(){
     const result=await call('/wallet');assert.equal(result.status,200);

@@ -1,3 +1,4 @@
+import {grantTestManager} from './fixtures.js';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
@@ -14,7 +15,9 @@ test('Team-Events: Termine, gemeinsame Bearbeitung und dauerhafte Speicherung',a
   const payload=()=>({id:randomUUID(),title:'Whiskyabend',start:'2027-01-15T20:00',description:''});
   async function call(route,body,{cookie=alice,method=body?'POST':'GET'}={}){
     const response=await fetch(base+route,{method,headers:{...(cookie?{Cookie:cookie}:{}),...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined});
-    return {status:response.status,data:await response.json(),cookie:response.headers.get('set-cookie')?.split(';')[0]};
+    const result={status:response.status,data:await response.json(),cookie:response.headers.get('set-cookie')?.split(';')[0]};
+    if(route==='/login')await grantTestManager(db,result);
+    return result;
   }
   const list=async()=>{const result=await call('/events');assert.equal(result.status,200);return result.data.events;};
   await t.test('Alle Event-Endpunkte erfordern Anmeldung',async()=>{
