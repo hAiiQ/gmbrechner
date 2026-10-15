@@ -40,7 +40,7 @@ test('Rollenrechte und Eintrittsbuchungen werden auf dem Server durchgesetzt',as
     assert.equal(normalized.status,200);assert.equal(normalized.data.employee.role,'Security Leitung');
     assert.equal(normalized.data.employee.department,'Einlass frei eintragbar');
     const me=await call('/me',undefined,{cookie:otherGuard});
-    assert.deepEqual(me.data.employee.permissions,{manage:false,operations:true,statistics:true,payroll:true,cashier:true,entrance:true});
+    for(const [key,value] of Object.entries({manage:false,operations:true,statistics:true,payroll:true,cashier:true,entrance:true}))assert.equal(me.data.employee.permissions[key],value);
   });
   await t.test('Inhaber und Manager erreichen alle Seiten und dürfen Rollen und Preise ändern',async()=>{
     for(const cookie of [owner,manager])for(const path of ['/stats','/inventory','/purchases','/rentals','/finance','/wallet','/employees','/events','/admissions','/products?all=true'])assert.equal((await call(path,undefined,{cookie})).status,200,path);

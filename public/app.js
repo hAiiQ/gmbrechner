@@ -129,6 +129,7 @@ async function renderPage() {
   if(!state.employee)return;
   if(!allowedView(state.view))state.view=homeView();
   const epoch=++state.epoch;
+  if(state.view==='home')renderNoAccess();
   document.querySelectorAll('.nav button').forEach(b=>{b.classList.toggle('active',b.dataset.view===state.view);if(b.dataset.view===state.view)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
   if(state.view==='kasse'){renderKasse();refreshMetrics().catch(()=>{});}
   if(state.view==='stats')await renderStats(epoch);
@@ -289,7 +290,7 @@ function productForm(id) {
 async function orderDetails(id) {
   try{
     const {order,items}=await api(`/orders/${encodeURIComponent(id)}`);
-    openModal(`${modalHead('Buchung #'+order.id.slice(0,8).toUpperCase(),`${date(order.created_at)} · ${time(order.created_at)} Uhr`,'Buchungsdetails')}<div class="modal-body"><div class="detail-meta"><span>${esc(order.employee_name)}</span><span>${order.payment==='cash'?'Barzahlung':'Kartenzahlung'}</span></div>${items.map(i=>`<div class="detail-line"><span>${i.quantity} × ${esc(i.name)}<small>${money(i.price_cents,order.currency)} pro Stück</small></span><span>${money(i.price_cents*i.quantity,order.currency)}</span></div>`).join('')}${order.discount_basis_points>0?`<div class="detail-line"><span>Zwischensumme</span><strong>${money(order.total_cents+order.discount_cents,order.currency)}</strong></div><div class="detail-line detail-discount"><span>Rabatt (${percentText(order.discount_basis_points/100)} %)</span><strong>− ${money(order.discount_cents,order.currency)}</strong></div>`:''}<div class="detail-total"><span>Gesamt</span><strong>${money(order.total_cents,order.currency)}</strong></div>${order.is_delivery?'<p class="helper">Lieferung · 1.000 $ Lieferlohn für den buchenden Mitarbeiter. Bei Storno wird der Lieferlohn verrechnet.</p>':''}${order.voided_at?`<p class="void-note">Storniert am ${date(order.voided_at)} um ${time(order.voided_at)} Uhr.<br>Grund: ${esc(order.void_reason)}</p>`:`<div class="modal-actions"><button class="button danger" data-action="void-order" data-id="${esc(id)}">Buchung stornieren</button><button class="button" data-action="close-modal">Schließen</button></div>`}</div>`);
+    openModal(`${modalHead('Buchung #'+order.id.slice(0,8).toUpperCase(),`${date(order.created_at)} · ${time(order.created_at)} Uhr`,'Buchungsdetails')}<div class="modal-body"><div class="detail-meta"><span>${esc(order.employee_name)}</span><span>${order.payment==='cash'?'Barzahlung':'Kartenzahlung'}</span></div>${items.map(i=>`<div class="detail-line"><span>${i.quantity} × ${esc(i.name)}<small>${money(i.price_cents,order.currency)} pro Stück</small></span><span>${money(i.price_cents*i.quantity,order.currency)}</span></div>`).join('')}${order.discount_basis_points>0?`<div class="detail-line"><span>Zwischensumme</span><strong>${money(order.total_cents+order.discount_cents,order.currency)}</strong></div><div class="detail-line detail-discount"><span>Rabatt (${percentText(order.discount_basis_points/100)} %)</span><strong>− ${money(order.discount_cents,order.currency)}</strong></div>`:''}<div class="detail-total"><span>Gesamt</span><strong>${money(order.total_cents,order.currency)}</strong></div>${order.is_delivery?'<p class="helper">Lieferung · 1.000 $ Lieferlohn für den buchenden Mitarbeiter. Bei Storno wird der Lieferlohn verrechnet.</p>':''}${order.voided_at?`<p class="void-note">Storniert am ${date(order.voided_at)} um ${time(order.voided_at)} Uhr.<br>Grund: ${esc(order.void_reason)}</p>`:`<div class="modal-actions">${can('sales')||can('cashier')&&(can('operations')||order.employee_id===state.employee.id)?`<button class="button danger" data-action="void-order" data-id="${esc(id)}">Buchung stornieren</button>`:''}<button class="button" data-action="close-modal">Schließen</button></div>`}</div>`);
   }catch(error){toast(error.message,true);}
 }
 function voidForm(id) {
@@ -356,6 +357,7 @@ async function action(button) {
     case 'wallet-transfer':walletForm('transfer',button.dataset.account);break;
     case 'wallet-adjust':walletForm('adjustment',button.dataset.account);break;
     case 'edit-employee':employeeForm(id);break;
+    case 'edit-employee-permissions':employeePermissionsForm(id);break;
     case 'kick-employee':employeeAccessForm('kick',id);break;
     case 'end-employee-sessions':employeeAccessForm('sessions',id);break;
     case 'restore-employee':employeeAccessForm('restore',id);break;

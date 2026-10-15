@@ -3,8 +3,8 @@ const unitName = (id,quantity=2) => (quantity===1?{hour:'Stunde',week:'Woche',mo
 function stockBadge(p){return `<span class="stock-badge ${p.stock_quantity<30?'low':''}">${p.stock_quantity===0?'Ausverkauft':`${p.stock_quantity} Stück${p.stock_quantity<30?' · nachfüllen':''}`}</span>`;}
 function stockNotice() {
   const low=state.products.filter(p=>p.stock_quantity<30);
-  const tag=can('operations')?'button':'div';
-  return low.length?`<${tag} class="stock-notice" ${can('operations')?'data-action="navigate" data-view="inventory"':''}>${icon('box')}<span><strong>${low.length} Artikel unter 30 Stück</strong><small>${esc(low.slice(0,3).map(p=>`${p.name}: ${p.stock_quantity}`).join(' · '))}</small></span></${tag}>`:'';
+  const tag=can('inventory')?'button':'div';
+  return low.length?`<${tag} class="stock-notice" ${can('inventory')?'data-action="navigate" data-view="inventory"':''}>${icon('box')}<span><strong>${low.length} Artikel unter 30 Stück</strong><small>${esc(low.slice(0,3).map(p=>`${p.name}: ${p.stock_quantity}`).join(' · '))}</small></span></${tag}>`:'';
 }
 function refreshStockNotice(){if($('#stock-notice'))$('#stock-notice').innerHTML=stockNotice();}
 function recoveryNotice() {
