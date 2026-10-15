@@ -40,14 +40,14 @@ test('Rollenrechte und Eintrittsbuchungen werden auf dem Server durchgesetzt',as
     assert.equal(normalized.status,200);assert.equal(normalized.data.employee.role,'Security Leitung');
     assert.equal(normalized.data.employee.department,'Einlass frei eintragbar');
     const me=await call('/me',undefined,{cookie:otherGuard});
-    assert.deepEqual(me.data.employee.permissions,{manage:false,cashier:false,entrance:true});
+    assert.deepEqual(me.data.employee.permissions,{manage:false,operations:true,statistics:true,payroll:true,cashier:true,entrance:true});
   });
   await t.test('Inhaber und Manager erreichen alle Seiten und dürfen Rollen und Preise ändern',async()=>{
     for(const cookie of [owner,manager])for(const path of ['/stats','/inventory','/purchases','/rentals','/finance','/wallet','/employees','/events','/admissions','/products?all=true'])assert.equal((await call(path,undefined,{cookie})).status,200,path);
     assert.equal((await call('/employees/'+bartenderId,{role:'Barkeeper',department:'Bar unten'},{cookie:manager,method:'PUT'})).status,200);
   });
-  await t.test('Barkeeper und Leitung können nur Kasse und Teamtermine lesen; keine Verwaltung oder Selbstbeförderung',async()=>{
-    for(const cookie of [bartender,lead,guest]){
+  await t.test('Barkeeper können nur Kasse und Teamtermine lesen; keine Verwaltung oder Selbstbeförderung',async()=>{
+    for(const cookie of [bartender,guest]){
       for(const path of ['/products','/cashier-summary','/events'])assert.equal((await call(path,undefined,{cookie})).status,200,path);
       const products=(await call('/products',undefined,{cookie})).data.products;assert.ok(!Object.hasOwn(products[0],'purchase_price_cents'));
       for(const path of ['/stats','/orders/export','/inventory','/purchases','/rentals','/finance','/wallet','/employees','/products?all=true','/admissions'])assert.equal((await call(path,undefined,{cookie})).status,403,path);
@@ -56,12 +56,12 @@ test('Rollenrechte und Eintrittsbuchungen werden auf dem Server durchgesetzt',as
     const sales={id:randomUUID(),items:[{productId:'cola',quantity:1,unitPriceCents:30000}],payment:'cash',currency:'USD'};
     const saved=await call('/orders',sales,{cookie:bartender});assert.equal(saved.status,201);
     assert.equal((await call('/orders/'+sales.id,undefined,{cookie:bartender})).status,200);
-    assert.equal((await call('/orders/'+sales.id,undefined,{cookie:lead})).status,403);
-    assert.equal((await call('/orders/'+sales.id+'/void',{reason:'Falsche Person'},{cookie:lead})).status,403);
+    assert.equal((await call('/orders/'+sales.id,undefined,{cookie:guest})).status,403);
+    assert.equal((await call('/orders/'+sales.id+'/void',{reason:'Falsche Person'},{cookie:guest})).status,403);
     assert.equal((await call('/orders/'+sales.id+'/void',{reason:'Testverkauf'},{cookie:bartender})).status,200);
   });
   await t.test('Security hat ausschließlich Eintritt und lesbare Teamtermine, auch bei direkten API-Aufrufen',async()=>{
-    for(const cookie of [guard,otherGuard]){
+    for(const cookie of [guard]){
       for(const path of ['/products','/cashier-summary','/stats','/inventory','/wallet','/finance','/employees','/purchases','/rentals'])assert.equal((await call(path,undefined,{cookie})).status,403,path);
       for(const path of ['/orders','/products','/finance','/wallet/transfer','/events'])assert.equal((await call(path,{}, {cookie})).status,403,path);
     }
@@ -99,7 +99,7 @@ test('Rollenrechte und Eintrittsbuchungen werden auf dem Server durchgesetzt',as
     assert.ok((await call('/finance')).data.entries.find(e=>e.admission_id===cardEntry.id).voided_at);
   });
   await t.test('Rollenänderungen gelten sofort für vorhandene Sitzungen; Besitzerzuweisung bleibt einmalig',async()=>{
-    assert.equal((await call('/employees/'+guardId,{role:'Barkeeper Leitung',department:'Bar'},{method:'PUT'})).status,200);
+    assert.equal((await call('/employees/'+guardId,{role:'Barkeeper',department:'Bar'},{method:'PUT'})).status,200);
     assert.equal((await call('/admissions',entry(),{cookie:guard})).status,403);assert.equal((await call('/products',undefined,{cookie:guard})).status,200);
     assert.equal((await call('/employees/'+ownerId,{role:'Barkeeper',department:'Bar'},{cookie:manager,method:'PUT'})).status,200);
     await initializeDatabase(db);

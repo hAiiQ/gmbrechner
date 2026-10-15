@@ -5,8 +5,11 @@ Eine responsive Kasse in Schwarz, Oliv und Gold, gestaltet mit eurem Emblem und 
 ## Was enthalten ist
 
 - Anmeldung mit Mitarbeitername und gemeinsamem Bar-Passwort; optional 30 Tage angemeldet bleiben. Derselbe Name wird unabhängig von Groß-/Kleinschreibung wiedererkannt.
-- Mitarbeiterliste mit sechs voreingestellten Jobs und frei eintragbarer Abteilung, Rauswerfen aus der Liste, Wiederherstellen, Abmelden auf allen Geräten und Deaktivieren.
-- Rollenrechte: Inhaber und Manager mit Vollzugriff, Barkeeper/Leitung nur Kasse und Security/Leitung nur Eintrittsbuchungen.
+- Mitarbeiterliste mit mehreren auswählbaren Rängen je Person und frei eintragbarer Abteilung, Rauswerfen aus der Liste, Wiederherstellen, Abmelden auf allen Geräten und Deaktivieren.
+- Rollenrechte: Inhaber und Manager mit Vollzugriff, beide Leitungen für alle Arbeitsbereiche und Statistiken, Barkeeper für Kasse und Security für Eintritt; kombinierbar.
+- Stempeluhr auf jeder Seite mit Arbeitsrangwahl, Lohnberechnung und separater Lohnübersicht samt Bankauszahlung.
+- Mitarbeiterstatistik mit Zeitraum, Suche, Rang-/Statusfiltern, Sortierung, Einzelhistorie und CSV-Export.
+- Lieferoption pro Kassenzettel mit einmalig 1.000 $ Lieferlohn für den buchenden Mitarbeiter.
 - Eintritt mit Preis pro Person, Personenanzahl, Zahlungsart und automatischer Gutschrift in Finanzen und Kassenstand.
 - Events-Seite für Mitarbeiter: Termine mit Datum und Uhrzeit eintragen, bearbeiten und löschen; Beschreibung und Ende sind optional.
 - Artikelliste mit Kategorien und Suche, Mengenauswahl, Warenkorb und exakter Berechnung in Cent.
@@ -14,7 +17,7 @@ Eine responsive Kasse in Schwarz, Oliv und Gold, gestaltet mit eurem Emblem und 
 - Verkauf buchen mit Kennzeichnung „Bar“ oder „Karte“. Die Seite erfasst die Zahlung; sie belastet keine Karte und verbindet kein Kartenterminal.
 - Umsatz pro Mitarbeiter, Gesamtumsatz, Tages-/Wochen-/Monatsübersicht und eigene Datumsfilter.
 - Buchungsdetails, meistverkaufte Artikel und CSV-Export aller Positionen im gewählten Zeitraum.
-- Artikelverwaltung für Inhaber und Manager: Preise ändern, Artikel hinzufügen und pausieren.
+- Artikelverwaltung für Inhaber, Manager und beide Leitungen: Preise ändern, Artikel hinzufügen und pausieren.
 - Storno mit Begründung. Die ursprüngliche Buchung bleibt sichtbar und zählt nicht mehr zum Umsatz.
 - Eigene Einkaufsseite: Einkaufsmengen erfassen, Einkaufspreise berechnen, Bestand erhöhen und Kosten automatisch als Ausgabe buchen.
 - Lagerbestand mit Warnungen unter 30 Stück, automatischem Abzug bei Verkäufen, Rückgabe bei Storno und Bestandsänderungen mit Grund.
@@ -52,26 +55,53 @@ Beim ersten Deploy der Passwort-Erweiterung werden die bisherigen Sitzungen ohne
 | --- | --- |
 | Inhaber | Alle Seiten und Funktionen |
 | Manager | Alle Seiten und Funktionen |
-| Barkeeper / Barkeeper Leitung | Kasse, eigene Verkäufe und eigene Verkaufsstornos |
-| Security / Security Leitung | Eintritt buchen, eigene Eintritte ansehen und stornieren |
+| Barkeeper Leitung / Security Leitung | Kasse, Eintritt, Lager, Einkauf, VIP, Events, Mitarbeiter, Sortiment und Statistiken; eigener Lohn |
+| Barkeeper | Kasse, eigene Verkäufe und eigene Verkaufsstornos; eigener Lohn |
+| Security | Eintritt buchen, eigene Eintritte ansehen und stornieren; eigener Lohn |
 
-Die Abteilung bleibt frei eintragbar und verändert keine Rechte. Rollen ändern ausschließlich Inhaber oder Manager unter **Mitarbeiter → Rolle & Abteilung**. Änderungen gelten sofort für bestehende Sitzungen. Die Oberfläche zeigt nur die erlaubten Seiten; direkte API-Aufrufe werden ebenfalls geprüft. Mindestens ein aktiver Inhaber oder Manager bleibt erhalten. **Michael Black** bekommt bei Einführung einmalig die Inhaberrolle; spätere Rollenänderungen werden durch Deployments nicht überschrieben. Neue Namen erhalten zunächst den Job „Barkeeper“.
+Unter **Mitarbeiter → Rolle & Abteilung** einen oder mehrere Ränge ankreuzen. Die Rechte aller Ränge werden kombiniert: **Barkeeper + Security** erlaubt Kasse und Eintritt. Die Abteilung bleibt frei eintragbar und verändert keine Rechte. Beide Leitungen dürfen die Arbeitsbereiche vollständig bearbeiten und Mitarbeiter unterhalb des Managements verwalten. Inhaber/Manager vergeben oder ändern Management-Ränge und verwalten Management-Mitglieder. Finanzen, Kassenstand und Lohnauszahlungen bleiben Inhabern/Managern vorbehalten. Änderungen gelten sofort für bestehende Sitzungen; direkte API-Aufrufe werden ebenfalls geprüft. Mindestens ein aktiver Inhaber oder Manager bleibt erhalten. **Michael Black** bekommt bei Einführung einmalig die Inhaberrolle; spätere Rollenänderungen werden durch Deployments nicht überschrieben. Neue Namen erhalten zunächst „Barkeeper“. Bisherige einzelne Ränge werden beim Update einmalig übernommen.
 
 Die Anmeldung verwendet weiterhin Namen und das gemeinsame Bar-Passwort. Wer dieses Passwort kennt, kann einen anderen Namen eingeben und dessen Rolle verwenden; die Anmeldung ist deshalb kein Nachweis einer persönlichen Identität.
 
-Unter **Eintritt** Preis pro Person in Dollar, Anzahl und Zahlungsart angeben. Der Gesamtbetrag wird aus **Preis × Menge** berechnet. Eine Buchung erzeugt gemeinsam einen Eintrittsdatensatz, eine Finanz-Einnahme mit der Art „Eintritt“ und eine Geldbewegung: **Bar** liegt beim buchenden Mitarbeiter, **Karte** auf dem Übergangskonto und **Bank** direkt auf dem Bankkonto. Die Einnahme nicht zusätzlich manuell erfassen. Security sieht die eigenen Buchungen, Inhaber und Manager alle. **Stornieren** verlangt einen Grund und korrigiert Eintritt, Finanz-Einnahme und Geldbestand zusammen; nach einer Bankeinzahlung wird bereits abgegebenes Geld über die Bank erstattet. Wiederholungen erzeugen keine zweite Einnahme. Weitere Deployments erhalten alle Buchungen und Geldbestände.
+Unter **Eintritt** Preis pro Person in Dollar, Anzahl und Zahlungsart angeben. Der Gesamtbetrag wird aus **Preis × Menge** berechnet. Eine Buchung erzeugt gemeinsam einen Eintrittsdatensatz, eine Finanz-Einnahme mit der Art „Eintritt“ und eine Geldbewegung: **Bar** liegt beim buchenden Mitarbeiter, **Karte** auf dem Übergangskonto und **Bank** direkt auf dem Bankkonto. Die Einnahme nicht zusätzlich manuell erfassen. Security sieht die eigenen Buchungen; Inhaber, Manager und beide Leitungen sehen alle. **Stornieren** verlangt einen Grund und korrigiert Eintritt, Finanz-Einnahme und Geldbestand zusammen; nach einer Bankeinzahlung wird bereits abgegebenes Geld über die Bank erstattet. Wiederholungen erzeugen keine zweite Einnahme. Weitere Deployments erhalten alle Buchungen und Geldbestände.
 
-Die Mitarbeitertermine bleiben sichtbar: Auf Kasse und Eintritt gibt es **Nächste Events fürs Team** zum Aufklappen. Inhaber und Manager verwalten die Termine auf der Events-Seite.
+Die Mitarbeitertermine bleiben sichtbar: Auf Kasse und Eintritt gibt es **Nächste Events fürs Team** zum Aufklappen. Inhaber, Manager und beide Leitungen verwalten die Termine auf der Events-Seite.
 
 ## Mitarbeiterliste
 
 Unter **Mitarbeiter** erscheinen alle Namen, die sich bisher angemeldet haben, einschließlich abgemeldeter und deaktivierter Personen. Entfernte Personen werden in der normalen Liste und ihren Zählern ausgeblendet; sie sind ausschließlich über den Filter **Entfernte Mitarbeiter** sichtbar. Die Übersicht zeigt Rolle, Abteilung, letzte Anmeldung, Anzahl gültiger Anmeldungen und noch vorhandenes Bargeld. Nach Name, Rolle oder Abteilung suchen oder nach aktiv, angemeldet und deaktiviert filtern. Eine gültige Anmeldung ist kein Nachweis, dass die Person gerade die Seite geöffnet hat.
 
-Über **Rolle & Abteilung → Job** genau eine der sechs Vorgaben auswählen: **Inhaber, Manager, Barkeeper Leitung, Barkeeper, Security Leitung, Security**. Eigene Jobnamen lassen sich nicht mehr speichern. Die **Abteilung** ist ein freies Textfeld, etwa „Bar“, „Küche“ oder „VIP-Service“, und darf leer bleiben. Die Rolle bestimmt den Zugriff gemäß der obigen Tabelle. Inhaber und Manager verwalten diese Angaben und die Mitarbeiterliste.
+Über **Rolle & Abteilung → Ränge** eine oder mehrere der sechs Vorgaben auswählen: **Inhaber, Manager, Barkeeper Leitung, Barkeeper, Security Leitung, Security**. Mindestens ein Rang muss ausgewählt sein. Eigene Jobnamen lassen sich nicht speichern. Die **Abteilung** ist ein freies Textfeld, etwa „Bar“, „Küche“ oder „VIP-Service“, und darf leer bleiben. Die Ränge bestimmen gemeinsam den Zugriff gemäß der obigen Tabelle.
 
 **Rauswerfen** entfernt die Person aus der normalen Mitarbeiterliste, beendet alle Anmeldungen und sperrt die erneute Anmeldung mit diesem Namen. Das funktioniert auch bei bereits abgemeldeten oder deaktivierten Mitarbeitern. Über **Entfernte Mitarbeiter → Wiederherstellen** lässt sich die Person mit derselben Mitarbeiter-ID, Rolle und Abteilung zurückholen; dann kann sie sich wieder anmelden. Umsätze, Buchungen und Bargeld werden dabei nicht gelöscht. Eigene Entfernung ist gesperrt; ein anderer Inhaber oder Manager kann dies übernehmen. **Anmeldungen beenden** meldet eine Person auf allen Geräten ab, behält sie in der Mitarbeiterliste und lässt die erneute Anmeldung zu. **Deaktivieren** beendet zusätzlich die Anmeldungen und sperrt die erneute Anmeldung mit diesem Namen, auch mit anderer Groß-/Kleinschreibung. Weil die Anmeldung weiterhin einen frei gewählten Namen und das gemeinsame Passwort verwendet, ist diese Sperre an den Namen gebunden. Über **Wieder aktivieren** kann die Person mit ihrer bisherigen Mitarbeiter-ID zurückkehren. Niemand kann sich selbst deaktivieren; ein anderer Inhaber oder Manager kann dies übernehmen.
 
 Es werden keine Mitarbeiterdaten gelöscht: bisherige Umsätze, Buchungen, Bargeldbestände und Zuordnungen bleiben bei Rauswurf oder Deaktivierung erhalten. Offenes Bargeld bleibt auch unter **Kassenstand** sichtbar und kann weiterhin auf die Bank eingezahlt werden. Beim ersten Update auf die feste Jobliste werden bekannte Jobs einheitlich geschrieben. Frühere eigene Jobnamen und „Mitarbeiter“ werden einmalig zu „Barkeeper“ mit denselben Kassenrechten. Die gewünschte andere Rolle danach in der Job-Auswahl setzen. Abteilungen, Anmeldungen, Sperren, Umsätze und Geldbestände bleiben erhalten. Spätere Deployments bewahren die eingetragenen Angaben und Sperren.
+
+## Stempeluhr und Löhne
+
+Oben in der Leiste ist auf jeder Seite die **Stempeluhr** sichtbar. **Einstempeln** öffnet die Auswahl der eigenen zugewiesenen Ränge. Genau einen Arbeitsrang für die Schicht auswählen:
+
+| Arbeitsrang | Stundenlohn |
+| --- | ---: |
+| Barkeeper / Security | 10.000 $ |
+| Barkeeper Leitung / Security Leitung | 15.000 $ |
+| Inhaber / Manager | 20.000 $ |
+
+Mehrere Ränge erzeugen keinen doppelten Lohn. Pro Mitarbeiter läuft höchstens eine Schicht; für einen Rangwechsel zuerst ausstempeln und dann neu einstempeln. **Ausstempeln** beendet die Schicht und merkt den Lohn sekundengenau anteilig auf volle Cent gerundet vor. Der gewählte Rang und Tarif bleiben für diese Schicht gespeichert, auch wenn später die Ränge geändert werden. Zeit und Lohn berechnet der Server. Anmeldungen auf mehreren Geräten zeigen dieselbe Schicht. Abmelden, Neuladen und Deployments beenden die Schicht nicht automatisch. Rauswerfen oder Deaktivieren beendet eine laufende Schicht; der verdiente Lohn bleibt erhalten.
+
+Unter **Löhne** sehen Mitarbeiter ihre eigenen Arbeitszeiten, Lohnpositionen und bisherigen Auszahlungen. Inhaber und Manager sehen das ganze Team, können vergessene Schichten beenden und über **Lohn auszahlen** den offenen Betrag auszahlen. Ausgezahlt werden abgeschlossene Schichten und vorgemerkter Lieferlohn; laufende Schichten werden erst nach dem Ausstempeln ergänzt. Der Button erzeugt gemeinsam eine Bankabbuchung, eine Finanz-Ausgabe und einen Auszahlungsnachweis. Bargeld beim Mitarbeiter und das Karten-Übergangskonto bleiben unverändert. Es muss genug Bankguthaben vorhanden sein. Pro Auszahlung sind bis zu 10.000.000 $ möglich. Doppelte Speicheranfragen zahlen denselben Lohn nur einmal aus; eine inzwischen geänderte Lohnsumme verlangt eine aktualisierte Übersicht. Alte Umsätze bekommen rückwirkend keinen Lohn.
+
+## Lieferungen
+
+In der Kasse beim Kassenzettel **Lieferung** ankreuzen. Ein erfolgreich gebuchter Kassenzettel merkt **einmalig 1.000 $ Lieferlohn** für den buchenden Mitarbeiter vor, unabhängig von Artikel- und Stückzahl. Die Bestellung bleibt zu ihren normalen Preisen und Rabatten gebucht. Der Bonus erhöht den Verkaufspreis nicht und belastet die Bank erst bei **Löhne → Lohn auszahlen**. Die Lieferoption bleibt im offenen Warenkorb gespeichert und wird nach erfolgreichem Verkauf zurückgesetzt. Buchungsdetails und Verkaufs-CSV zeigen die Kennzeichnung.
+
+Wird eine Lieferung storniert, entfällt ihr noch nicht ausgezahlter Lieferlohn. Bereits ausgezahlter Lieferlohn wird als negative Lohnposition mit künftigem Lohn verrechnet; das Storno bucht keinen fiktiven Geldrückfluss auf die Bank. Die Statistik berücksichtigt diese Korrekturen.
+
+## Mitarbeiterstatistik
+
+Unter **Statistiken** können Inhaber, Manager und beide Leitungen alle Mitarbeiter vergleichen. Zeitraum (Heute, 7 Tage, Monat, Gesamt oder Datum), Name/Abteilung, Rang und Status filtern; beispielsweise nach Einnahmen, Arbeitszeit, offenem Lohn, Lieferungen oder Name auf- und absteigend sortieren. Mehrfach zugewiesene Ränge sind bei jedem passenden Rangfilter enthalten.
+
+**Alle Details** zeigt pro Person Artikelverkäufe, Stornos, Eintritte, Vermietungen, Einkauf, sonstige Einnahmen/Ausgaben, Arbeitszeit, Löhne, Lieferungen und Lagerbewegungen. Über **Weitere Einträge laden** die Historie weiterblättern. Der Mitarbeiter-CSV enthält sämtliche Einträge des Zeitraums; der Überblick-CSV alle Mitarbeiter im Zeitraum. Summen sind in USD; Euro-Altverkäufe bleiben in der Einzelhistorie mit ihrer ursprünglichen Währung sichtbar. Arbeitszeit wird auf den Zeitraum begrenzt; **Lohn offen** und **Bargeld** zeigen ausdrücklich den aktuellen Stand. Entfernte Mitarbeiter und ihre Historie bleiben abrufbar. Einkäufe und manuelle Finanzbuchungen werden nach ihrem Buchungsdatum gefiltert, Verkäufe nach ihrem Erfassungszeitpunkt (Europe/Berlin).
 
 ## FiveM-Tablet und eingebettete Browser
 
@@ -125,9 +155,9 @@ Die Meldung `.env not found. Continuing without it.` ist auf Render normal: Die 
 3. Rechts Mengen nach Bedarf ändern und Zahlungsart wählen.
 4. Nach Zahlungseingang **Verkauf buchen**. Erst die erfolgreiche Serverantwort zählt als gebuchter Umsatz.
 5. Unter **Umsätze** Mitarbeiterbeträge und Gesamtsumme für den gewünschten Zeitraum ansehen. **Gesamt** zeigt die gesamte Historie.
-6. Über **Details → Buchung stornieren** können Barkeeper ihre eigenen Verkäufe mit Grund stornieren; Inhaber und Manager dürfen alle Verkäufe stornieren.
+6. Über **Details → Buchung stornieren** können Barkeeper ihre eigenen Verkäufe mit Grund stornieren; Inhaber, Manager und beide Leitungen dürfen alle Verkäufe stornieren.
 
-Mit „Angemeldet bleiben“ ist die Anmeldung auf dem Gerät 30 Tage gültig, auch nach Browser- und Server-Neustarts. Ohne diese Option gilt das Cookie für die Browser-Sitzung und die Anmeldung höchstens zwölf Stunden. Das Sortiment ist für Inhaber und Manager bearbeitbar. Tagesgrenzen und Zeitangaben richten sich nach `Europe/Berlin`. Die Kassenansicht aktualisiert Karte und Tageswerte alle 30 Sekunden; in der Umsatzübersicht könnt ihr **Aktualisieren** wählen.
+Mit „Angemeldet bleiben“ ist die Anmeldung auf dem Gerät 30 Tage gültig, auch nach Browser- und Server-Neustarts. Ohne diese Option gilt das Cookie für die Browser-Sitzung und die Anmeldung höchstens zwölf Stunden. Das Sortiment ist für Inhaber, Manager und beide Leitungen bearbeitbar. Tagesgrenzen und Zeitangaben richten sich nach `Europe/Berlin`. Die Kassenansicht aktualisiert Karte und Tageswerte alle 30 Sekunden; in der Umsatzübersicht könnt ihr **Aktualisieren** wählen.
 
 Preisänderungen betreffen neue Verkäufe. Enthält ein offener Warenkorb einen alten Preis, lehnt der Server die Buchung ab: den Artikel entfernen und mit dem aktuellen Preis erneut hinzufügen. Pausierte Artikel können nicht neu gebucht werden.
 
@@ -160,13 +190,13 @@ Die Einkaufspreise aus den Bildern und der Ergänzung werden einmalig eingespiel
 | Magische Kohle und alle sechs weiteren Aromen, inklusive Blutmondkirsche und Frostminze | 300 $ |
 | Alle 15 weiteren Kartenartikel | 100 $ |
 
-Einkaufspreise sind für Inhaber und Manager unter **Sortiment → Bearbeiten → Einkaufspreis ($)** änderbar. Bei neuen Artikeln ohne Einkaufspreis muss dieser zuerst ergänzt werden. Pausierte Artikel können eingekauft werden. Änderungen und weitere Deployments ändern weder historische Einkäufe noch Bestände oder Geldbeträge. Wiederholte Buchungsanfragen buchen die Mengen und Kosten nur einmal.
+Einkaufspreise sind für Inhaber, Manager und beide Leitungen unter **Sortiment → Bearbeiten → Einkaufspreis ($)** änderbar. Bei neuen Artikeln ohne Einkaufspreis muss dieser zuerst ergänzt werden. Pausierte Artikel können eingekauft werden. Änderungen und weitere Deployments ändern weder historische Einkäufe noch Bestände oder Geldbeträge. Wiederholte Buchungsanfragen buchen die Mengen und Kosten nur einmal.
 
 Unter **Letzte Einkäufe → Details** einen Einkauf mit Grund stornieren. Das zieht die Menge wieder vom Lager ab und storniert die Ausgabe; beide Änderungen erfolgen gemeinsam. Bereits verbrauchter Bestand darf nicht negativ werden: das Storno wird abgelehnt, wenn die nötige Menge nicht mehr vorhanden ist. Einkaufs-Ausgaben lassen sich deshalb ausschließlich über den zugehörigen Einkauf stornieren. Bei Verbindungsproblemen den gespeicherten Status über **Buchung prüfen** klären.
 
 ## Events fürs Team
 
-Unter **Events → Event eintragen** einen Eventnamen, Datum und Uhrzeit eingeben. **Infos für das Team** und ein Endzeitpunkt sind optional. Inhaber und Manager können die Termine sehen, bearbeiten und über **Details → Löschen** entfernen. Andere Mitarbeiter sehen kommende Termine als Hinweis auf Kasse oder Eintritt. Das Löschen benötigt eine Bestätigung. Eventzeiten gelten für **Europe/Berlin**; ungültige Daten und Uhrzeiten während der Zeitumstellung werden abgelehnt.
+Unter **Events → Event eintragen** einen Eventnamen, Datum und Uhrzeit eingeben. **Infos für das Team** und ein Endzeitpunkt sind optional. Inhaber, Manager und beide Leitungen können die Termine sehen, bearbeiten und über **Details → Löschen** entfernen. Andere Mitarbeiter sehen kommende Termine als Hinweis auf Kasse oder Eintritt. Das Löschen benötigt eine Bestätigung. Eventzeiten gelten für **Europe/Berlin**; ungültige Daten und Uhrzeiten während der Zeitumstellung werden abgelehnt.
 
 Die Übersicht zeigt kommende und laufende Termine zuerst, mit Suche und Filtern für **Kommend & laufend**, **Alle Events** und **Vergangen**. Ohne Endzeitpunkt erscheint ein Termin ab seiner Startzeit unter „Vergangen“; mit Endzeitpunkt erscheint er dazwischen als „Läuft gerade“. Wer den Termin eingetragen und zuletzt bearbeitet hat, wird angezeigt. Die Seite aktualisiert sich alle 30 Sekunden, wenn kein Dialog geöffnet ist.
 
@@ -211,13 +241,13 @@ Offene Lager-/Einkaufs-/VIP-/Finanz-/Eintritts-/Geldanfragen bleiben bei Verbind
 
 ## Technik und Prüfung
 
-Node.js, Express, PostgreSQL (`pg`), lokale PostgreSQL-Engine (`PGlite`), HTML/CSS/JavaScript ohne Buildschritt. Bilder und Schriften laden ohne externe Dienste. Buchungsbeträge werden serverseitig aus aktuellen Preisen berechnet, Mitarbeitende werden aus der Sitzung zugeordnet. Sitzungen verwenden HttpOnly-Cookies, im Produktionsmodus HTTPS. Die Artikelverwaltung ist für Inhaber und Manager offen. Das gemeinsame Bar-Passwort wird ausschließlich auf dem Server gegen einen gesalzenen scrypt-Verifikator geprüft. Namen ordnen die Buchungen weiterhin dem jeweiligen Mitarbeiter zu. Das Passwort wird weder im Frontend noch im Browser-Speicher abgelegt.
+Node.js, Express, PostgreSQL (`pg`), lokale PostgreSQL-Engine (`PGlite`), HTML/CSS/JavaScript ohne Buildschritt. Bilder und Schriften laden ohne externe Dienste. Buchungsbeträge werden serverseitig aus aktuellen Preisen berechnet, Mitarbeitende werden aus der Sitzung zugeordnet. Sitzungen verwenden HttpOnly-Cookies, im Produktionsmodus HTTPS. Die Artikelverwaltung ist für Inhaber, Manager und beide Leitungen offen. Das gemeinsame Bar-Passwort wird ausschließlich auf dem Server gegen einen gesalzenen scrypt-Verifikator geprüft. Namen ordnen die Buchungen weiterhin dem jeweiligen Mitarbeiter zu. Das Passwort wird weder im Frontend noch im Browser-Speicher abgelegt.
 
 ```powershell
 npm run check
 npm test
 ```
 
-Die Integrationstests prüfen Berechnung und Mitarbeiterzuordnung, doppelte und gleichzeitige Requests, Preisänderungen, ungültige Mengen, Stornos, Berliner Tagesgrenzen, CSV und dauerhafte lokale Speicherung. Zusätzlich prüfen sie die 24 Foto-Bestände, konkurrierende Verkäufe, Stock-Stornos, einmalige Datenmigration, feste Miettarife, Wochenlaufzeiten, Sommerzeit, gleichzeitige Gäste sowie Finanzsummen und -stornos sowie Passwortschutz, dauerhafte/abgelaufene Sitzungen, die 24 Einkaufspreise, Einkaufsabrechnung, Bestandszuwachs, Wiederholungen und Einkaufsstornos. Die Mitarbeiter-Tests prüfen voreingestellte Jobs und freie Abteilungen, Rauswurf auf mehreren Geräten, Namenssperren und Wiederaktivierung, konkurrierende Anmeldung/Deaktivierung sowie den Erhalt von Umsätzen, Bargeld, Mitarbeiter-IDs und Angaben beim Update. Die Rollen- und Eintrittstests prüfen direkte API-Sperren, Sofortwirkung geänderter Rollen, einmalige Besitzerzuweisung, Schutz der letzten Leitung, Zahlungsgutschriften, eigene Buchungen, Stornos und Wiederholungen. Sie verwenden eigene isolierte Testdatenbanken.
+Die Integrationstests prüfen Berechnung und Mitarbeiterzuordnung, doppelte und gleichzeitige Requests, Preisänderungen, ungültige Mengen, Stornos, Berliner Tagesgrenzen, CSV und dauerhafte lokale Speicherung. Zusätzlich prüfen sie die 24 Foto-Bestände, konkurrierende Verkäufe, Stock-Stornos, einmalige Datenmigration, feste Miettarife, Wochenlaufzeiten, Sommerzeit, gleichzeitige Gäste sowie Finanzsummen und -stornos sowie Passwortschutz, dauerhafte/abgelaufene Sitzungen, die 24 Einkaufspreise, Einkaufsabrechnung, Bestandszuwachs, Wiederholungen und Einkaufsstornos. Die Mitarbeiter-Tests prüfen voreingestellte Jobs und freie Abteilungen, Rauswurf auf mehreren Geräten, Namenssperren und Wiederaktivierung, konkurrierende Anmeldung/Deaktivierung sowie den Erhalt von Umsätzen, Bargeld, Mitarbeiter-IDs und Angaben beim Update. Die Rollen- und Eintrittstests prüfen direkte API-Sperren, Sofortwirkung geänderter Rollen, einmalige Besitzerzuweisung, Schutz des letzten Management-Mitglieds, Zahlungsgutschriften, eigene Buchungen, Stornos und Wiederholungen. Die Erweiterungstests prüfen kombinierte Ränge, Rechte beider Leitungen, gewählten Stundenlohn, einzelne laufende Schichten, sekundengenaue Abrechnung, Bankdeckung, einmalige Auszahlung, Lieferstornos vor/nach Auszahlung sowie Statistik-Summen, Berliner Zeiträume und lückenloses Blättern der Einzelhistorie. Sie verwenden eigene isolierte Testdatenbanken.
 
 Dateien: `server.js` startet die App; `lib/app.js` enthält die API; `lib/database.js` verwaltet Datenbank und Tabellen; `public/` enthält die Oberfläche; `render.yaml` bereitet das Hosting vor.
